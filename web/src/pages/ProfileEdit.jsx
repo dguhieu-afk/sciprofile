@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Eye, Lock } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
-import { liveCap, titleCase } from '../utils'
+import { liveCap, titleCase, capFirst } from '../utils'
 import ExportCvButton from '../components/ExportCvButton'
 
 const yearRange = (a, b) => (a ? `${a} – ${b || 'nay'}` : '')
@@ -74,12 +74,12 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render }) 
                   <option value="">-- Chọn --</option>
                   {f.options.map(o => <option key={o}>{o}</option>)}
                 </select>
-              ) : f.type === 'textarea' ? (
+                           ) : f.type === 'textarea' ? (
                 <textarea rows={2} value={draft[f.key]} placeholder={f.placeholder}
-                  onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} />
+                  onChange={e => setDraft({ ...draft, [f.key]: capFirst(e.target.value) })} />
               ) : (
                 <input type={f.type || 'text'} value={draft[f.key]} placeholder={f.placeholder}
-                  onChange={e => setDraft({ ...draft, [f.key]: e.target.value })} />
+                  onChange={e => setDraft({ ...draft, [f.key]: f.type === 'number' ? e.target.value : liveCap(e.target.value) })} />
               )}
             </label>
           ))}
@@ -140,6 +140,8 @@ export default function ProfileEdit() {
   if (!f || !researcher) return <main className="container page"><div className="empty">Đang tải...</div></main>
 
   const set = k => e => setF({ ...f, [k]: e.target.value })
+    const setCap = k => e => setF({ ...f, [k]: liveCap(e.target.value) })
+  const setFirst = k => e => setF({ ...f, [k]: capFirst(e.target.value) })
   const today = new Date().toISOString().slice(0, 10)
 
   async function save(e) {
@@ -220,19 +222,19 @@ export default function ProfileEdit() {
             <input type="date" value={f.birth_date} max={today} onChange={set('birth_date')} />
           </label>
           <label><span className="lock"><Lock size={12} /> Nơi sinh</span>
-            <input value={f.birth_place} onChange={set('birth_place')} placeholder="TP. Hồ Chí Minh" />
+            <input value={f.birth_place} onChange={setCap('birth_place')} placeholder="TP. Hồ Chí Minh" />
           </label>
           <label><span className="lock"><Lock size={12} /> Quê quán</span>
-            <input value={f.hometown} onChange={set('hometown')} />
+            <input value={f.hometown} onChange={setCap('hometown')} />
           </label>
           <label><span className="lock"><Lock size={12} /> Dân tộc</span>
-            <input value={f.ethnicity} onChange={set('ethnicity')} placeholder="Kinh" />
+            <input value={f.ethnicity} onChange={setCap('ethnicity')} placeholder="Kinh" />
           </label>
           <label>Quốc tịch
-            <input value={f.nationality} onChange={set('nationality')} />
+            <input value={f.nationality} onChange={setCap('nationality')} />
           </label>
           <label className="wide"><span className="lock"><Lock size={12} /> Chỗ ở riêng hoặc địa chỉ liên lạc</span>
-            <input value={f.address} onChange={set('address')} />
+            <input value={f.address} onChange={setCap('address')} />
           </label>
           <label><span className="lock"><Lock size={12} /> Điện thoại cơ quan (CQ)</span>
             <input type="tel" value={f.phone_office} onChange={set('phone_office')} />
@@ -260,7 +262,7 @@ export default function ProfileEdit() {
             </select>
           </label>
           <label className="wide">Chức vụ (hiện tại hoặc trước khi nghỉ hưu)
-            <input value={f.position} onChange={set('position')} placeholder="Trưởng bộ môn" />
+            <input value={f.position} onChange={setCap('position')} placeholder="Trưởng bộ môn" />
           </label>
           <label>Chức danh khoa học cao nhất
             <select value={f.academic_title} onChange={set('academic_title')}>
@@ -282,7 +284,7 @@ export default function ProfileEdit() {
             <input type="number" value={f.degree_year} onChange={set('degree_year')} />
           </label>
           <label>Nước nhận học vị
-            <input value={f.degree_country} onChange={set('degree_country')} placeholder="Việt Nam" />
+            <input value={f.degree_country} onChange={setCap('degree_country')} placeholder="Việt Nam" />
           </label>
         </div>
 
@@ -301,7 +303,7 @@ export default function ProfileEdit() {
             <input value={f.research_interests} onChange={set('research_interests')} placeholder="Trí tuệ nhân tạo, Học máy, Giáo dục số" />
           </label>
           <label className="wide">Tiểu sử tóm tắt
-            <textarea rows={4} value={f.bio} onChange={set('bio')} placeholder="Vài dòng giới thiệu về hướng nghiên cứu và thành tựu của bạn..." />
+            <textarea rows={4} value={f.bio} onChange={setFirst('bio')} placeholder="Vài dòng giới thiệu về hướng nghiên cứu và thành tựu của bạn..." />
           </label>
         </div>
 

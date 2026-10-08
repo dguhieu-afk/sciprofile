@@ -6,3 +6,6 @@ export const liveCap = s =>
 export const titleCase = s =>
   s.trim().replace(/\s+/g, ' ').toLowerCase().split(' ')
     .map(w => w.charAt(0).toLocaleUpperCase('vi') + w.slice(1)).join(' ')
+    // Chỉ viết hoa chữ cái đầu của cả câu (dùng cho tiểu sử, mô tả)
+export const capFirst = s =>
+  s.length ? s.charAt(0).toLocaleUpperCase('vi') + s.slice(1) : s
