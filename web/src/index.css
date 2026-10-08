@@ -274,3 +274,5 @@ td select { height: 36px; border: 1px solid var(--line); border-radius: 8px; pad
 .review-grid dt { color: var(--muted); font-size: 14px; }
 .review-grid dd { font-weight: 500; word-break: break-word; }
 @media (max-width: 860px) { .review-grid { grid-template-columns: 1fr; } }
+.doi-card { background: var(--teal-50); border-color: var(--teal-100); }
+.doi-card h2 { margin-top: 0; }

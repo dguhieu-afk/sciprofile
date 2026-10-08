@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, X, Star, AlertTriangle } from 'lucide-react'
+import { Plus, X, Star, AlertTriangle, Wand2, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import FileUpload from '../components/FileUpload'
+import { extractDoi, fetchByDoi } from '../doiLookup'
 
 const types = {
   JOURNAL: 'Bài báo tạp chí', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
@@ -11,12 +12,12 @@ const types = {
   RESEARCH_PROJECT: 'Đề tài nghiên cứu', OTHER: 'Khác',
 }
 const clean = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+  .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().replace(/\s+/g, ' ').trim()
 const blank = {
   title: '', abstract: '', publication_type: 'JOURNAL',
   publication_year: new Date().getFullYear(),
   journal: '', volume: '', issue: '', pages: '', doi: '', issn: '', isbn: '',
-  pdf_url: '', keywords: '',
+  pdf_url: '', keywords: '', citation_count: 0,
 }
 
 export default function PublicationForm() {
@@ -37,6 +38,12 @@ export default function PublicationForm() {
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(!editing)
 
+  // Nhập nhanh bằng DOI
+  const [doiInput, setDoiInput] = useState('')
+  const [doiBusy, setDoiBusy] = useState(false)
+  const [doiMsg, setDoiMsg] = useState(null) // { ok, text }
+  const [dupDoi, setDupDoi] = useState([])
+
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
 
   useEffect(() => {
@@ -45,14 +52,12 @@ export default function PublicationForm() {
       .then(({ data }) => setAllRes(data || []))
   }, [])
 
-  // Tác giả mặc định là chính mình
   useEffect(() => {
     if (!editing && researcher && authors.length === 0) {
       setAuthors([{ id: researcher.id, full_name: researcher.full_name, corresponding: true }])
     }
   }, [researcher, editing]) // eslint-disable-line
 
-  // Nạp dữ liệu khi sửa
   useEffect(() => {
     if (!editing || !user) return
     async function load() {
@@ -68,6 +73,7 @@ export default function PublicationForm() {
         publication_type: p.publication_type, publication_year: p.publication_year || '',
         journal: p.journal || '', volume: p.volume || '', issue: p.issue || '', pages: p.pages || '',
         doi: p.doi || '', issn: p.issn || '', isbn: p.isbn || '', pdf_url: p.pdf_url || '',
+        citation_count: p.citation_count || 0,
         keywords: p.publication_keywords.map(k => k.keywords.name).join(', '),
       })
       setAreaIds(p.publication_research_areas.map(a => a.research_area_id))
@@ -78,7 +84,6 @@ export default function PublicationForm() {
     load()
   }, [id, user]) // eslint-disable-line
 
-  // Phát hiện trùng lặp theo tiêu đề
   useEffect(() => {
     if (f.title.trim().length < 10) { setSimilar([]); return }
     const t = setTimeout(async () => {
@@ -91,8 +96,48 @@ export default function PublicationForm() {
   const set = k => e => setF({ ...f, [k]: e.target.value })
   const toggleArea = aid => setAreaIds(a => a.includes(aid) ? a.filter(x => x !== aid) : [...a, aid])
 
+  async function lookup() {
+    setDoiMsg(null); setDupDoi([])
+    const doi = extractDoi(doiInput)
+    if (!doi) {
+      setDoiMsg({ ok: false, text: 'Không thấy DOI trong nội dung vừa dán. DOI bắt đầu bằng "10." (ví dụ 10.1038/nature14539). Nếu dán link của nhà xuất bản, hãy tìm DOI ghi trên trang bài báo.' })
+      return
+    }
+    setDoiBusy(true)
+    try {
+      const d = await fetchByDoi(doi)
+
+      // Kiểm tra DOI đã có trong hệ thống chưa
+      const { data: dup } = await supabase.from('publications').select('id,title,status').ilike('doi', doi)
+      setDupDoi((dup || []).filter(x => String(x.id) !== String(id)))
+
+      // Ghép tác giả: trùng tên với người đã có thì dùng lại, còn lại tạo mới khi lưu
+      const list = d.authors.map((name, i) => {
+        const hit = allRes.find(r => clean(r.full_name) === clean(name))
+          || (researcher && clean(researcher.full_name) === clean(name) ? researcher : null)
+        return hit
+          ? { id: hit.id, full_name: hit.full_name, corresponding: i === 0 }
+          : { id: `new-${i}`, full_name: name, corresponding: i === 0 }
+      })
+      if (list.length) setAuthors(list)
+
+      setF(prev => ({
+        ...prev,
+        title: d.title || prev.title, abstract: d.abstract || prev.abstract,
+        publication_type: d.publication_type, publication_year: d.publication_year || prev.publication_year,
+        journal: d.journal, volume: d.volume, issue: d.issue, pages: d.pages,
+        doi: d.doi, issn: d.issn, isbn: d.isbn, keywords: d.keywords,
+        citation_count: d.citation_count,
+      }))
+      setDoiMsg({ ok: true, text: `Đã điền thông tin từ Crossref (${d.authors.length} tác giả, ${d.citation_count} trích dẫn). Hãy kiểm tra lại, chọn lĩnh vực và tải file trước khi gửi duyệt.` })
+    } catch (e) {
+      setDoiMsg({ ok: false, text: e.message })
+    }
+    setDoiBusy(false)
+  }
+
   const suggestions = useMemo(() => {
-    const k = clean(q.trim())
+    const k = clean(q)
     if (!k) return []
     return allRes.filter(r => !authors.some(a => a.id === r.id) && clean(r.full_name).includes(k)).slice(0, 5)
   }, [q, allRes, authors])
@@ -101,13 +146,10 @@ export default function PublicationForm() {
     setAuthors([...authors, { id: r.id, full_name: r.full_name, corresponding: false }])
     setQ('')
   }
-  async function createAuthor() {
+  function addNewAuthor() {
     const name = newName.trim()
     if (name.length < 2) return
-    const { data, error } = await supabase.from('researchers').insert({ full_name: name }).select('id,full_name').single()
-    if (error) { setErr(error.message); return }
-    setAllRes([...allRes, data])
-    setAuthors([...authors, { id: data.id, full_name: data.full_name, corresponding: false }])
+    setAuthors([...authors, { id: `new-${Date.now()}`, full_name: name, corresponding: false }])
     setNewName('')
   }
   const removeAuthor = aid => setAuthors(authors.filter(a => a.id !== aid))
@@ -135,8 +177,21 @@ export default function PublicationForm() {
       title: f.title.trim(), abstract: t(f.abstract), publication_type: f.publication_type,
       publication_year: year, journal: t(f.journal), volume: t(f.volume), issue: t(f.issue),
       pages: t(f.pages), doi: t(f.doi), issn: t(f.issn), isbn: t(f.isbn), pdf_url: t(f.pdf_url),
+      citation_count: Number(f.citation_count) || 0,
       status, admin_note: null, updated_at: new Date().toISOString(),
     }
+
+    // Tạo hồ sơ cho các tác giả chưa có trong hệ thống
+    const resolved = []
+    for (const a of authors) {
+      if (String(a.id).startsWith('new-')) {
+        const { data, error } = await supabase.from('researchers')
+          .insert({ full_name: a.full_name }).select('id').single()
+        if (error) { setErr(error.message); setBusy(false); return }
+        resolved.push({ ...a, id: data.id })
+      } else resolved.push(a)
+    }
+
     let pid = id
     if (editing) {
       const { error } = await supabase.from('publications').update(payload).eq('id', id)
@@ -151,7 +206,7 @@ export default function PublicationForm() {
       pid = data.id
     }
 
-    const a = await supabase.from('publication_authors').insert(authors.map((x, i) => ({
+    const a = await supabase.from('publication_authors').insert(resolved.map((x, i) => ({
       publication_id: pid, researcher_id: x.id, author_order: i + 1, is_corresponding: x.corresponding,
     })))
     if (a.error) { setErr(a.error.message); setBusy(false); return }
@@ -171,7 +226,7 @@ export default function PublicationForm() {
       }
     }
     setBusy(false)
-   navigate('/dashboard', { state: { submitted: status === 'PENDING' } })
+    navigate('/dashboard', { state: { submitted: status === 'PENDING' } })
   }
 
   if (!loaded) return <main className="container page"><div className="empty">Đang tải...</div></main>
@@ -182,6 +237,34 @@ export default function PublicationForm() {
         <h1>{editing ? 'Sửa công trình' : 'Thêm công trình mới'}</h1>
         <p>Lưu nháp để làm tiếp sau, hoặc gửi duyệt để công trình xuất hiện trong kho công khai.</p>
       </div>
+
+      {!editing && (
+        <div className="form-card doi-card">
+          <h2><Wand2 size={18} style={{ verticalAlign: '-3px' }} /> Nhập nhanh bằng DOI</h2>
+          <p className="hint">Dán DOI hoặc đường dẫn doi.org của bài báo, hệ thống tự điền thông tin từ Crossref. Ví dụ: 10.1038/nature14539</p>
+          <div className="inline" style={{ marginTop: 12 }}>
+            <input value={doiInput} onChange={e => setDoiInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookup() } }}
+              placeholder="10.xxxx/xxxxx hoặc https://doi.org/10.xxxx/xxxxx" />
+            <button type="button" className="btn btn-primary" onClick={lookup} disabled={doiBusy || !doiInput.trim()}>
+              {doiBusy ? 'Đang tìm...' : 'Tự động điền'}
+            </button>
+          </div>
+          {doiMsg && (
+            <div className={doiMsg.ok ? 'ok-msg' : 'auth-error'} style={{ marginTop: 12 }}>
+              {doiMsg.ok && <CheckCircle2 size={14} style={{ verticalAlign: '-2px' }} />} {doiMsg.text}
+            </div>
+          )}
+          {dupDoi.length > 0 && (
+            <div className="warn" style={{ marginTop: 12 }}>
+              <AlertTriangle size={16} />
+              <div><b>DOI này đã có trong hệ thống:</b>
+                {dupDoi.map(d => <div key={d.id}>• {d.title}</div>)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="form-card">
         <h2>Thông tin chính</h2>
@@ -232,7 +315,11 @@ export default function PublicationForm() {
         <div className="item-list">
           {authors.map((a, i) => (
             <div className="item" key={a.id}>
-              <div><b>{i + 1}. {a.full_name}</b>{a.corresponding && <span className="item-sub"> ★ Tác giả chính</span>}</div>
+              <div>
+                <b>{i + 1}. {a.full_name}</b>
+                {a.corresponding && <span className="item-sub"> ★ Tác giả chính</span>}
+                {String(a.id).startsWith('new-') && <span className="item-sub"> · chưa có tài khoản</span>}
+              </div>
               <div className="actions">
                 <button type="button" className="link-btn" onClick={() => move(i, -1)}>↑</button>
                 <button type="button" className="link-btn" onClick={() => move(i, 1)}>↓</button>
@@ -260,7 +347,7 @@ export default function PublicationForm() {
           <label>Hoặc thêm tác giả chưa có tài khoản
             <div className="inline">
               <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Họ và tên" />
-              <button type="button" className="btn btn-ghost" onClick={createAuthor}><Plus size={16} /></button>
+              <button type="button" className="btn btn-ghost" onClick={addNewAuthor}><Plus size={16} /></button>
             </div>
           </label>
         </div>
@@ -273,14 +360,14 @@ export default function PublicationForm() {
           <label>Tập (Volume)<input value={f.volume} onChange={set('volume')} /></label>
           <label>Số (Issue)<input value={f.issue} onChange={set('issue')} /></label>
           <label>Trang<input value={f.pages} onChange={set('pages')} placeholder="12-25" /></label>
-                    <div className="wide">
+          <div className="wide">
             <FileUpload value={f.pdf_url} userId={user?.id}
               onChange={v => setF(prev => ({ ...prev, pdf_url: v }))} />
           </div>
         </div>
 
         {err && <div className="auth-error" style={{ marginTop: 16 }}>{err}</div>}
-           <p className="hint" style={{ marginTop: 14 }}>Sau khi gửi kiểm duyệt: Chúng tôi sẽ cập nhật dữ liệu cho bạn trong khoảng 1-2 ngày.</p>
+        <p className="hint" style={{ marginTop: 14 }}>Sau khi gửi kiểm duyệt: Chúng tôi sẽ cập nhật dữ liệu cho bạn trong khoảng 1-2 ngày.</p>
         <div className="form-actions">
           <button className="btn btn-ghost" disabled={busy} onClick={() => save('DRAFT')}>Lưu nháp</button>
           <button className="btn btn-primary" disabled={busy} onClick={() => save('PENDING')}>
