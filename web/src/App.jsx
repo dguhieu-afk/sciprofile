@@ -4,12 +4,14 @@ import Home from './pages/Home'
 import Research from './pages/Research'
 import ResearchDetail from './pages/ResearchDetail'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Researchers from './pages/Researchers'
 import ResearcherProfile from './pages/ResearcherProfile'
 import ProfileEdit from './pages/ProfileEdit'
 import Dashboard from './pages/Dashboard'
 import PublicationForm from './pages/PublicationForm'
 import Admin from './pages/Admin'
+import AdminReview from './pages/AdminReview'
 import AdminReports from './pages/AdminReports'
 import Favorites from './pages/Favorites'
 import Network from './pages/Network'
@@ -19,6 +21,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
         <Route path="/research" element={<Research />} />
@@ -33,6 +36,7 @@ export default function App() {
         <Route path="/dashboard/edit/:id" element={<PublicationForm />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/review/:id" element={<AdminReview />} />
         <Route path="/admin/reports" element={<AdminReports />} />
       </Route>
     </Routes>

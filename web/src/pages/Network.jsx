@@ -96,7 +96,7 @@ export default function Network() {
                 const a = pos(e.a), b = pos(e.b)
                 const on = !hot || (hover && (e.a === hover || e.b === hover))
                 return <line key={`${e.a}-${e.b}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke="#0d9488" strokeOpacity={on ? 0.7 : 0.1} strokeWidth={1.5 + e.w * 2} />
+                  stroke="#2563eb" strokeOpacity={on ? 0.7 : 0.1} strokeWidth={1.5 + e.w * 2} />
               })}
               {graph.nodes.map(n => {
                 const r = 16 + n.works * 3
@@ -105,7 +105,7 @@ export default function Network() {
                   <g key={n.id} style={{ cursor: 'pointer', opacity: dim ? 0.25 : 1 }}
                     onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
                     onClick={() => navigate(`/researchers/${n.id}`)}>
-                    <circle cx={n.x} cy={n.y} r={r} fill="#0f766e" stroke="#fff" strokeWidth="3" />
+                    <circle cx={n.x} cy={n.y} r={r} fill="#1d4ed8" stroke="#fff" strokeWidth="3" />
                     <text x={n.x} y={n.y + 5} textAnchor="middle" fill="#fff" fontSize="14" fontWeight="700">
                       {n.name.trim().split(' ').pop()[0]}
                     </text>

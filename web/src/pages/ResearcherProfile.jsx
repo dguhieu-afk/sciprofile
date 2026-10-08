@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Printer, Pencil, Mail, Globe, GraduationCap, FileText, Quote, Users, Link as LinkIcon } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
+import ExportCvButton from '../components/ExportCvButton'
 
 const typeNames = {
   JOURNAL: 'Bài báo', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
@@ -85,6 +86,7 @@ export default function ResearcherProfile() {
         </div>
         <div className="cv-actions no-print">
           <button className="btn btn-ghost" onClick={() => window.print()}><Printer size={16} /> In / Lưu PDF</button>
+          {isMe && <ExportCvButton researcherId={r.id} />}
           {isMe && <Link to="/profile/edit" className="btn btn-primary"><Pencil size={16} /> Chỉnh sửa</Link>}
         </div>
       </section>

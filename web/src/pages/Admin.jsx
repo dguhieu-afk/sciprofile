@@ -107,6 +107,7 @@ export default function Admin() {
               </p>
               {p.abstract && <p className="abs">{p.abstract}</p>}
               <div className="form-actions" style={{ justifyContent: 'flex-start', marginTop: 4 }}>
+                <Link to={`/admin/review/${p.id}`} className="btn btn-ghost">Xem chi tiết</Link>
                 <button className="btn btn-primary" onClick={() => approve(p)}><Check size={16} /> Duyệt</button>
                 <button className="btn btn-ghost" onClick={() => reject(p)}><X size={16} /> Từ chối</button>
               </div>

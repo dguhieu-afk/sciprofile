@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Pencil, Send, Trash2, FileText, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Plus, Pencil, Send, Trash2, FileText, Clock, CheckCircle2, XCircle, Info } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 
@@ -11,12 +11,15 @@ const statusInfo = {
   REJECTED: { label: 'Bị từ chối', cls: 's-bad' },
   ARCHIVED: { label: 'Lưu trữ', cls: 's-draft' },
 }
+const WAIT_NOTE = 'Chúng tôi đã ghi nhận dữ liệu của bạn. Chúng tôi sẽ cập nhật dữ liệu cho bạn trong khoảng 1-2 ngày. Xin chân thành cảm ơn!'
 
 export default function Dashboard() {
   const { user, researcher, ready } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [justSent, setJustSent] = useState(Boolean(location.state?.submitted))
 
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
 
@@ -33,6 +36,7 @@ export default function Dashboard() {
   async function submitForReview(id) {
     if (!confirm('Gửi công trình này cho quản trị viên kiểm duyệt?')) return
     await supabase.from('publications').update({ status: 'PENDING', admin_note: null }).eq('id', id)
+    setJustSent(true)
     load()
   }
   async function remove(id) {
@@ -54,6 +58,12 @@ export default function Dashboard() {
         <Link to="/dashboard/new" className="btn btn-primary"><Plus size={16} /> Thêm công trình</Link>
       </div>
 
+      {justSent && (
+        <div className="ok-msg note-big">
+          <Info size={18} /> <span>{WAIT_NOTE}</span>
+        </div>
+      )}
+
       <div className="cv-stats" style={{ marginTop: 24 }}>
         <div><FileText size={18} /><b>{items.length}</b><span>Tổng công trình</span></div>
         <div><CheckCircle2 size={18} /><b>{count('APPROVED')}</b><span>Đã công khai ({cites} trích dẫn)</span></div>
@@ -74,6 +84,9 @@ export default function Dashboard() {
             </div>
             <h3>{p.title}</h3>
             <p className="authors">{p.journal}</p>
+            {p.status === 'PENDING' && (
+              <div className="wait-note"><Info size={16} /> <span>{WAIT_NOTE}</span></div>
+            )}
             {p.status === 'REJECTED' && p.admin_note && (
               <div className="auth-error"><b>Lý do từ chối:</b> {p.admin_note}</div>
             )}

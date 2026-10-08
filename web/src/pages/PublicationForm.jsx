@@ -171,7 +171,7 @@ export default function PublicationForm() {
       }
     }
     setBusy(false)
-    navigate('/dashboard')
+   navigate('/dashboard', { state: { submitted: status === 'PENDING' } })
   }
 
   if (!loaded) return <main className="container page"><div className="empty">Đang tải...</div></main>
@@ -280,6 +280,7 @@ export default function PublicationForm() {
         </div>
 
         {err && <div className="auth-error" style={{ marginTop: 16 }}>{err}</div>}
+           <p className="hint" style={{ marginTop: 14 }}>Sau khi gửi kiểm duyệt: Chúng tôi sẽ cập nhật dữ liệu cho bạn trong khoảng 1-2 ngày.</p>
         <div className="form-actions">
           <button className="btn btn-ghost" disabled={busy} onClick={() => save('DRAFT')}>Lưu nháp</button>
           <button className="btn btn-primary" disabled={busy} onClick={() => save('PENDING')}>

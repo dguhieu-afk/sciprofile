@@ -26,7 +26,7 @@ export default function Layout() {
         <div className="container nav-inner">
           <Link className="logo" to="/">
             <span className="logo-mark"><GraduationCap size={20} /></span>
-            SciProfile
+            UTEProfile
           </Link>
 
           <nav className="nav-links">
@@ -77,7 +77,7 @@ export default function Layout() {
       <Outlet />
 
       <footer className="footer">
-        © 2026 SciProfile – Academic Research Repository
+        © 2026 UTEProfile – Academic Research Repository
       </footer>
     </>
   )
