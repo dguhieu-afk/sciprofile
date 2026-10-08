@@ -5,6 +5,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import FileUpload from '../components/FileUpload'
 import { extractDoi, fetchByDoi } from '../doiLookup'
+import { suggestAreas } from '../areaSuggest'
 
 const types = {
   JOURNAL: 'Bài báo tạp chí', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
@@ -29,6 +30,8 @@ export default function PublicationForm() {
   const [f, setF] = useState(blank)
   const [areas, setAreas] = useState([])
   const [areaIds, setAreaIds] = useState([])
+    const [sugg, setSugg] = useState([])
+  const [suggTried, setSuggTried] = useState(false)
   const [allRes, setAllRes] = useState([])
   const [authors, setAuthors] = useState([])
   const [q, setQ] = useState('')
@@ -47,7 +50,7 @@ export default function PublicationForm() {
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
 
   useEffect(() => {
-    supabase.from('research_areas').select('id,name').order('id').then(({ data }) => setAreas(data || []))
+    supabase.from('research_areas').select('id,name,parent_id').order('id').then(({ data }) => setAreas(data || []))
     supabase.from('researchers').select('id,full_name,academic_title').order('full_name')
       .then(({ data }) => setAllRes(data || []))
   }, [])
@@ -95,6 +98,12 @@ export default function PublicationForm() {
 
   const set = k => e => setF({ ...f, [k]: e.target.value })
   const toggleArea = aid => setAreaIds(a => a.includes(aid) ? a.filter(x => x !== aid) : [...a, aid])
+    function autoSuggest() {
+    const picked = suggestAreas(areas, { title: f.title, keywords: f.keywords, abstract: f.abstract })
+    setSugg(picked)
+    setSuggTried(true)
+    setAreaIds(prev => [...new Set([...prev, ...picked])])
+  }
 
   async function lookup() {
     setDoiMsg(null); setDupDoi([])
@@ -129,7 +138,11 @@ export default function PublicationForm() {
         doi: d.doi, issn: d.issn, isbn: d.isbn, keywords: d.keywords,
         citation_count: d.citation_count,
       }))
-      setDoiMsg({ ok: true, text: `Đã điền thông tin từ Crossref (${d.authors.length} tác giả, ${d.citation_count} trích dẫn). Hãy kiểm tra lại, chọn lĩnh vực và tải file trước khi gửi duyệt.` })
+            const picked = suggestAreas(areas, { title: d.title, keywords: d.keywords, abstract: d.abstract })
+      setSugg(picked)
+      setSuggTried(true)
+      setAreaIds(prev => [...new Set([...prev, ...picked])])
+      setDoiMsg({ ok: true, text: `Đã điền thông tin từ Crossref (${d.authors.length} tác giả, ${d.citation_count} trích dẫn). ${picked.length ? `Đã gợi ý ${picked.length} lĩnh vực ở mục bên dưới, hãy kiểm tra lại.` : 'Chưa gợi ý được lĩnh vực, hãy tự chọn.'} Nhớ tải file trước khi gửi duyệt.` })
     } catch (e) {
       setDoiMsg({ ok: false, text: e.message })
     }
@@ -302,14 +315,25 @@ export default function PublicationForm() {
           </label>
         </div>
 
-        <h2>Lĩnh vực nghiên cứu</h2>
+                <div className="row-between" style={{ alignItems: 'center' }}>
+          <h2>Lĩnh vực nghiên cứu</h2>
+          <button type="button" className="btn btn-ghost" onClick={autoSuggest}><Wand2 size={15} /> Gợi ý lĩnh vực</button>
+        </div>
         <div className="chips-pick">
           {areas.map(a => (
-            <button type="button" key={a.id} className={areaIds.includes(a.id) ? 'on' : ''} onClick={() => toggleArea(a.id)}>
-              {a.name}
+            <button type="button" key={a.id}
+              className={areaIds.includes(a.id) ? 'on' : ''} onClick={() => toggleArea(a.id)}>
+              {a.name}{sugg.includes(a.id) && areaIds.includes(a.id) && ' ✦'}
             </button>
           ))}
         </div>
+        {suggTried && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            {sugg.length
+              ? 'Các ô có dấu ✦ được hệ thống gợi ý theo tiêu đề và từ khóa. Bạn bấm vào ô để bỏ chọn hoặc chọn thêm.'
+              : 'Chưa tìm thấy lĩnh vực phù hợp, hãy tự chọn bên trên.'}
+          </p>
+        )}
 
         <h2>Tác giả và đồng tác giả</h2>
         <div className="item-list">
