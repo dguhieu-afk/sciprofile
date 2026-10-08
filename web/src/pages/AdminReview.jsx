@@ -17,8 +17,10 @@ export default function AdminReview() {
   const { user, profile, isAdmin, ready } = useAuth()
   const navigate = useNavigate()
   const [p, setP] = useState(null)
+  const [owner, setOwner] = useState('')
   const [similar, setSimilar] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadErr, setLoadErr] = useState('')
 
   useEffect(() => {
     if (!ready) return
@@ -29,15 +31,26 @@ export default function AdminReview() {
   useEffect(() => {
     if (!isAdmin) return
     async function load() {
-      const { data } = await supabase.from('publications').select(`*,
-        profiles(email),
-        publication_authors(author_order,is_corresponding,researchers(id,full_name,academic_title)),
-        publication_research_areas(research_areas(name)),
-        publication_keywords(keywords(name))`).eq('id', id).maybeSingle()
-      setP(data)
-      if (data) {
-        const { data: sim } = await supabase.rpc('find_similar_publications', { t: data.title })
-        setSimilar((sim || []).filter(s => String(s.id) !== String(id)))
+      setLoading(true); setLoadErr('')
+      try {
+        const { data, error } = await supabase.from('publications').select(`*,
+          publication_authors(author_order,is_corresponding,researchers(id,full_name,academic_title)),
+          publication_research_areas(research_areas(name)),
+          publication_keywords(keywords(name))`).eq('id', id).maybeSingle()
+        if (error) throw error
+        setP(data)
+
+        if (data) {
+          if (data.created_by) {
+            const { data: owner } = await supabase.from('profiles').select('email').eq('id', data.created_by).maybeSingle()
+            setOwner(owner?.email || '')
+          }
+          const { data: sim } = await supabase.rpc('find_similar_publications', { t: data.title })
+          setSimilar((sim || []).filter(s => String(s.id) !== String(id)))
+        }
+      } catch (e) {
+        console.error('AdminReview:', e)
+        setLoadErr(e.message || String(e))
       }
       setLoading(false)
     }
@@ -63,8 +76,20 @@ export default function AdminReview() {
     navigate('/admin')
   }
 
-  if (!isAdmin || loading) return <main className="container page"><div className="empty">Đang tải...</div></main>
-  if (!p) return <main className="container page"><div className="empty">Không tìm thấy công trình.</div></main>
+  if (!isAdmin) return <main className="container page"><div className="empty">Đang kiểm tra quyền...</div></main>
+  if (loading) return <main className="container page"><div className="empty">Đang tải...</div></main>
+  if (loadErr) return (
+    <main className="container page">
+      <Link to="/admin" className="back"><ArrowLeft size={16} /> Quay lại</Link>
+      <div className="auth-error"><b>Lỗi tải dữ liệu:</b> {loadErr}</div>
+    </main>
+  )
+  if (!p) return (
+    <main className="container page">
+      <Link to="/admin" className="back"><ArrowLeft size={16} /> Quay lại</Link>
+      <div className="empty">Không tìm thấy công trình này.</div>
+    </main>
+  )
 
   const authors = [...p.publication_authors].sort((a, b) => a.author_order - b.author_order)
   const row = (label, value) => (
@@ -100,7 +125,7 @@ export default function AdminReview() {
 
         <h2>Thông tin nộp bài</h2>
         <dl className="review-grid">
-          {row('Người nộp (tài khoản)', p.profiles?.email)}
+          {row('Người nộp (tài khoản)', owner)}
           {row('Thời gian nộp', fmt(p.created_at))}
           {row('Cập nhật lần cuối', fmt(p.updated_at))}
         </dl>
@@ -140,6 +165,7 @@ export default function AdminReview() {
           {row('DOI', p.doi)}
           {row('ISSN', p.issn)}
           {row('ISBN', p.isbn)}
+          {row('Số trích dẫn', p.citation_count)}
         </dl>
 
         <h2>Tài liệu đính kèm</h2>
