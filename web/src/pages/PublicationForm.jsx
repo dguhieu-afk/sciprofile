@@ -320,12 +320,24 @@ export default function PublicationForm() {
           <button type="button" className="btn btn-ghost" onClick={autoSuggest}><Wand2 size={15} /> Gợi ý lĩnh vực</button>
         </div>
         <div className="chips-pick">
-          {areas.map(a => (
-            <button type="button" key={a.id}
-              className={areaIds.includes(a.id) ? 'on' : ''} onClick={() => toggleArea(a.id)}>
-              {a.name}{sugg.includes(a.id) && areaIds.includes(a.id) && ' ✦'}
-            </button>
-          ))}
+                  {areas.filter(a => !a.parent_id).map(root => {
+          const kids = areas.filter(a => a.parent_id === root.id)
+          const grand = areas.filter(a => kids.some(k => k.id === a.parent_id))
+          const group = [root, ...kids, ...grand]
+          return (
+            <div key={root.id} className="area-group">
+              <div className="area-title">{root.name}</div>
+              <div className="chips-pick">
+                {group.map(a => (
+                  <button type="button" key={a.id}
+                    className={areaIds.includes(a.id) ? 'on' : ''} onClick={() => toggleArea(a.id)}>
+                    {a.name}{sugg.includes(a.id) && areaIds.includes(a.id) && ' ✦'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        })}
         </div>
         {suggTried && (
           <p className="hint" style={{ marginTop: 10 }}>

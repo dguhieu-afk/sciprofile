@@ -277,3 +277,5 @@ td select { height: 36px; border: 1px solid var(--line); border-radius: 8px; pad
 .doi-card { background: var(--teal-50); border-color: var(--teal-100); }
 .doi-card h2 { margin-top: 0; }
 .form-card .upload-drop { display: grid; justify-items: center; gap: 4px; }
+.area-group { margin-top: 16px; }
+.area-title { font-size: 12px; font-weight: 700; color: var(--teal-700); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
