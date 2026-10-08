@@ -77,7 +77,7 @@ export default function Layout() {
       <Outlet />
 
       <footer className="footer">
-        © 2026 UTEProfile – Academic Research Repository
+        © 2026 UTEProfile – Phát triển by nguyentrunghieu - dguhieu@gmail.com
       </footer>
     </>
   )
