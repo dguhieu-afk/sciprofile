@@ -2,20 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 
-const W = 900, H = 560
+// Khung vẽ lớn hơn và lực đẩy mạnh hơn để các điểm dãn ra
+const W = 1300, H = 800
 
 function runLayout(nodes, edges) {
   const n = nodes.map((x, i) => {
     const a = (2 * Math.PI * i) / Math.max(nodes.length, 1)
-    return { ...x, x: W / 2 + Math.cos(a) * 200, y: H / 2 + Math.sin(a) * 200, vx: 0, vy: 0 }
+    return { ...x, x: W / 2 + Math.cos(a) * 330, y: H / 2 + Math.sin(a) * 280, vx: 0, vy: 0 }
   })
   const idx = new Map(n.map((x, i) => [x.id, i]))
-  for (let it = 0; it < 350; it++) {
+  for (let it = 0; it < 500; it++) {
     for (let i = 0; i < n.length; i++) {
       for (let j = i + 1; j < n.length; j++) {
         const dx = n[i].x - n[j].x, dy = n[i].y - n[j].y
         const d2 = Math.max(dx * dx + dy * dy, 1), d = Math.sqrt(d2)
-        const f = 12000 / d2
+        const f = 70000 / d2 // lực đẩy
         n[i].vx += (f * dx) / d; n[i].vy += (f * dy) / d
         n[j].vx -= (f * dx) / d; n[j].vy -= (f * dy) / d
       }
@@ -24,14 +25,14 @@ function runLayout(nodes, edges) {
       const a = n[idx.get(e.a)], b = n[idx.get(e.b)]
       const dx = b.x - a.x, dy = b.y - a.y
       const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-      const f = (d - 150) * 0.02
+      const f = (d - 300) * 0.015 // độ dài đường nối mong muốn
       a.vx += (f * dx) / d; a.vy += (f * dy) / d
       b.vx -= (f * dx) / d; b.vy -= (f * dy) / d
     })
     n.forEach(p => {
-      p.vx += (W / 2 - p.x) * 0.01; p.vy += (H / 2 - p.y) * 0.01
-      p.x = Math.min(W - 60, Math.max(60, p.x + p.vx * 0.85))
-      p.y = Math.min(H - 40, Math.max(40, p.y + p.vy * 0.85))
+      p.vx += (W / 2 - p.x) * 0.004; p.vy += (H / 2 - p.y) * 0.004 // lực kéo về giữa
+      p.x = Math.min(W - 110, Math.max(110, p.x + p.vx * 0.85))
+      p.y = Math.min(H - 80, Math.max(70, p.y + p.vy * 0.85))
       p.vx *= 0.6; p.vy *= 0.6
     })
   }
@@ -46,9 +47,13 @@ export default function Network() {
 
   useEffect(() => {
     supabase.from('publication_authors')
-      .select('publication_id,researcher_id,researchers(id,full_name),publications!inner(status)')
+      .select('publication_id,researcher_id,researchers(id,full_name,user_id),publications!inner(status)')
       .eq('publications.status', 'APPROVED')
-      .then(({ data }) => { setRows(data || []); setLoading(false) })
+      .then(({ data }) => {
+        // Chỉ giữ nhà nghiên cứu đã có tài khoản
+        setRows((data || []).filter(r => r.researchers && r.researchers.user_id))
+        setLoading(false)
+      })
   }, [])
 
   const graph = useMemo(() => {
@@ -82,11 +87,13 @@ export default function Network() {
     <main className="container page">
       <div className="page-head">
         <h1>Mạng lưới cộng tác nghiên cứu</h1>
-        <p>Mỗi điểm là một nhà nghiên cứu, mỗi đường nối là các công trình họ cùng thực hiện. Bấm vào điểm để xem hồ sơ.</p>
+        <p>Chỉ hiển thị các nhà nghiên cứu đã có tài khoản. Mỗi đường nối là các công trình họ cùng thực hiện. Rê chuột để làm nổi bật cộng sự, bấm vào điểm để xem hồ sơ.</p>
       </div>
 
       {loading && <div className="empty" style={{ marginTop: 24 }}>Đang tải...</div>}
-      {!loading && graph.nodes.length === 0 && <div className="empty" style={{ marginTop: 24 }}>Chưa có dữ liệu cộng tác.</div>}
+      {!loading && graph.nodes.length === 0 && (
+        <div className="empty" style={{ marginTop: 24 }}>Chưa có dữ liệu cộng tác giữa các nhà nghiên cứu có tài khoản.</div>
+      )}
 
       {graph.nodes.length > 0 && (
         <div className="detail" style={{ marginTop: 24 }}>
@@ -96,20 +103,21 @@ export default function Network() {
                 const a = pos(e.a), b = pos(e.b)
                 const on = !hot || (hover && (e.a === hover || e.b === hover))
                 return <line key={`${e.a}-${e.b}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  stroke="#2563eb" strokeOpacity={on ? 0.7 : 0.1} strokeWidth={1.5 + e.w * 2} />
+                  stroke="#2563eb" strokeOpacity={on ? 0.7 : 0.1} strokeWidth={2 + e.w * 2} />
               })}
               {graph.nodes.map(n => {
-                const r = 16 + n.works * 3
+                const r = 24 + n.works * 3
                 const dim = hot && !hot.has(n.id) && n.id !== hover
                 return (
                   <g key={n.id} style={{ cursor: 'pointer', opacity: dim ? 0.25 : 1 }}
                     onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
                     onClick={() => navigate(`/researchers/${n.id}`)}>
-                    <circle cx={n.x} cy={n.y} r={r} fill="#1d4ed8" stroke="#fff" strokeWidth="3" />
-                    <text x={n.x} y={n.y + 5} textAnchor="middle" fill="#fff" fontSize="14" fontWeight="700">
+                    <circle cx={n.x} cy={n.y} r={r} fill="#1d4ed8" stroke="#fff" strokeWidth="4" />
+                    <text x={n.x} y={n.y + 7} textAnchor="middle" fill="#fff" fontSize="20" fontWeight="700">
                       {n.name.trim().split(' ').pop()[0]}
                     </text>
-                    <text x={n.x} y={n.y + r + 18} textAnchor="middle" fill="#0f172a" fontSize="14" fontWeight="600">{n.name}</text>
+                    <text x={n.x} y={n.y + r + 26} textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="600"
+                      stroke="#fff" strokeWidth="5" paintOrder="stroke">{n.name}</text>
                   </g>
                 )
               })}
