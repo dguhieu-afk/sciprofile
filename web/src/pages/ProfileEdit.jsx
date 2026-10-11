@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, Eye, Lock } from 'lucide-react'
+import { Plus, Trash2, Eye, Lock, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import { liveCap, titleCase, capFirst } from '../utils'
@@ -11,7 +11,23 @@ const num = v => (v === '' || v == null ? null : parseInt(v, 10))
 const cleanPhone = s => String(s || '').replace(/[\s.\-]/g, '')
 const phoneOk = s => !s || /^(0|\+84)\d{9,10}$/.test(s)
 
-function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render }) {
+// Mục có thể bung ra / thu lại
+function Collapse({ title, count, defaultOpen = false, ctl, children }) {
+  const [open, setOpen] = useState(defaultOpen)
+  useEffect(() => { if (ctl && ctl.n > 0) setOpen(ctl.open) }, [ctl])
+  return (
+    <section className={`form-card acc ${open ? 'open' : ''}`}>
+      <button type="button" className="acc-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="acc-title">{title}</span>
+        {count != null && <em className="acc-count">{count}</em>}
+        <ChevronDown size={20} className="acc-chev" />
+      </button>
+      <div className="acc-body" hidden={!open}>{children}</div>
+    </section>
+  )
+}
+
+function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ctl }) {
   const blank = Object.fromEntries(fields.map(f => [f.key, '']))
   const [items, setItems] = useState([])
   const [draft, setDraft] = useState(blank)
@@ -45,8 +61,7 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render }) 
   }
 
   return (
-    <section className="form-card">
-      <h2>{title}</h2>
+    <Collapse title={title} count={items.length} ctl={ctl}>
       {hint && <p className="hint">{hint}</p>}
       <div className="item-list">
         {items.length === 0 && <div className="item-empty">Chưa có mục nào.</div>}
@@ -59,7 +74,7 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render }) 
                 {r.sub && <div className="item-sub">{r.sub}</div>}
                 {r.desc && <div className="item-desc">{r.desc}</div>}
               </div>
-              <button className="icon-btn" onClick={() => remove(i.id)} title="Xóa"><Trash2 size={16} /></button>
+              <button type="button" className="icon-btn" onClick={() => remove(i.id)} title="Xóa"><Trash2 size={16} /></button>
             </div>
           )
         })}
@@ -74,7 +89,7 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render }) 
                   <option value="">-- Chọn --</option>
                   {f.options.map(o => <option key={o}>{o}</option>)}
                 </select>
-                           ) : f.type === 'textarea' ? (
+              ) : f.type === 'textarea' ? (
                 <textarea rows={2} value={draft[f.key]} placeholder={f.placeholder}
                   onChange={e => setDraft({ ...draft, [f.key]: capFirst(e.target.value) })} />
               ) : (
@@ -87,7 +102,7 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render }) 
         {err && <div className="auth-error">{err}</div>}
         <button className="btn btn-ghost" type="submit"><Plus size={16} /> Thêm mục</button>
       </form>
-    </section>
+    </Collapse>
   )
 }
 
@@ -98,6 +113,7 @@ export default function ProfileEdit() {
   const [orgs, setOrgs] = useState([])
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
+  const [ctl, setCtl] = useState({ open: false, n: 0 })
 
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
 
@@ -140,7 +156,7 @@ export default function ProfileEdit() {
   if (!f || !researcher) return <main className="container page"><div className="empty">Đang tải...</div></main>
 
   const set = k => e => setF({ ...f, [k]: e.target.value })
-    const setCap = k => e => setF({ ...f, [k]: liveCap(e.target.value) })
+  const setCap = k => e => setF({ ...f, [k]: liveCap(e.target.value) })
   const setFirst = k => e => setF({ ...f, [k]: capFirst(e.target.value) })
   const today = new Date().toISOString().slice(0, 10)
 
@@ -206,112 +222,123 @@ export default function ProfileEdit() {
         </div>
       </div>
 
-      <form className="form-card" onSubmit={save}>
-        <h2>I. Lý lịch sơ lược</h2>
-        <div className="form-grid">
-          <label className="wide">Họ và tên *
-            <input value={f.full_name} onChange={e => setF({ ...f, full_name: liveCap(e.target.value) })} placeholder="Nguyễn Văn A" />
-          </label>
-          <label>Giới tính
-            <select value={f.gender} onChange={set('gender')}>
-              <option value="">-- Chọn --</option>
-              <option>Nam</option><option>Nữ</option><option>Khác</option>
-            </select>
-          </label>
-          <label><span className="lock"><Lock size={12} /> Ngày sinh</span>
-            <input type="date" value={f.birth_date} max={today} onChange={set('birth_date')} />
-          </label>
-          <label><span className="lock"><Lock size={12} /> Nơi sinh</span>
-            <input value={f.birth_place} onChange={setCap('birth_place')} placeholder="TP. Hồ Chí Minh" />
-          </label>
-          <label><span className="lock"><Lock size={12} /> Quê quán</span>
-            <input value={f.hometown} onChange={setCap('hometown')} />
-          </label>
-          <label><span className="lock"><Lock size={12} /> Dân tộc</span>
-            <input value={f.ethnicity} onChange={setCap('ethnicity')} placeholder="Kinh" />
-          </label>
-          <label>Quốc tịch
-            <input value={f.nationality} onChange={setCap('nationality')} />
-          </label>
-          <label className="wide"><span className="lock"><Lock size={12} /> Chỗ ở riêng hoặc địa chỉ liên lạc</span>
-            <input value={f.address} onChange={setCap('address')} />
-          </label>
-          <label><span className="lock"><Lock size={12} /> Điện thoại cơ quan (CQ)</span>
-            <input type="tel" value={f.phone_office} onChange={set('phone_office')} />
-          </label>
-          <label><span className="lock"><Lock size={12} /> Điện thoại nhà riêng (NR)</span>
-            <input type="tel" value={f.phone_home} onChange={set('phone_home')} />
-          </label>
-          <label><span className="lock"><Lock size={12} /> Điện thoại di động (DĐ)</span>
-            <input type="tel" value={f.phone} onChange={set('phone')} placeholder="0912 345 678" />
-          </label>
-          <label><span className="lock"><Lock size={12} /> Fax</span>
-            <input value={f.fax} onChange={set('fax')} />
-          </label>
-          <label>Email liên hệ (công khai)
-            <input type="email" value={f.contact_email} onChange={set('contact_email')} />
-          </label>
-        </div>
+      <div className="acc-tools">
+        <button type="button" className="link-btn" onClick={() => setCtl(c => ({ open: true, n: c.n + 1 }))}>Mở tất cả</button>
+        <button type="button" className="link-btn" onClick={() => setCtl(c => ({ open: false, n: c.n + 1 }))}>Thu gọn tất cả</button>
+      </div>
 
-        <h2>Đơn vị, chức vụ, học hàm, học vị</h2>
-        <div className="form-grid">
-          <label>Đơn vị công tác
-            <select value={f.organization_id} onChange={set('organization_id')}>
-              <option value="">-- Chọn --</option>
-              {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
-          </label>
-          <label className="wide">Chức vụ (hiện tại hoặc trước khi nghỉ hưu)
-            <input value={f.position} onChange={setCap('position')} placeholder="Trưởng bộ môn" />
-          </label>
-          <label>Chức danh khoa học cao nhất
-            <select value={f.academic_title} onChange={set('academic_title')}>
-              <option value="">-- Chọn --</option>
-              {['Trợ giảng', 'Giảng viên', 'Giảng viên chính', 'Nghiên cứu viên', 'Phó giáo sư', 'Giáo sư'].map(x => <option key={x}>{x}</option>)}
-            </select>
-          </label>
-          <label>Năm bổ nhiệm
-            <input type="number" value={f.title_year} onChange={set('title_year')} />
-          </label>
-          <span />
-          <label>Học vị cao nhất
-            <select value={f.academic_degree} onChange={set('academic_degree')}>
-              <option value="">-- Chọn --</option>
-              {['Cử nhân', 'Kỹ sư', 'Thạc sĩ', 'Tiến sĩ', 'Tiến sĩ khoa học'].map(x => <option key={x}>{x}</option>)}
-            </select>
-          </label>
-          <label>Năm nhận học vị
-            <input type="number" value={f.degree_year} onChange={set('degree_year')} />
-          </label>
-          <label>Nước nhận học vị
-            <input value={f.degree_country} onChange={setCap('degree_country')} placeholder="Việt Nam" />
-          </label>
-        </div>
+      <form onSubmit={save}>
+        <Collapse title="I. Lý lịch sơ lược" defaultOpen ctl={ctl}>
+          <div className="form-grid">
+            <label className="wide">Họ và tên *
+              <input value={f.full_name} onChange={e => setF({ ...f, full_name: liveCap(e.target.value) })} placeholder="Nguyễn Văn A" />
+            </label>
+            <label>Giới tính
+              <select value={f.gender} onChange={set('gender')}>
+                <option value="">-- Chọn --</option>
+                <option>Nam</option><option>Nữ</option><option>Khác</option>
+              </select>
+            </label>
+            <label><span className="lock"><Lock size={12} /> Ngày sinh</span>
+              <input type="date" value={f.birth_date} max={today} onChange={set('birth_date')} />
+            </label>
+            <label><span className="lock"><Lock size={12} /> Nơi sinh</span>
+              <input value={f.birth_place} onChange={setCap('birth_place')} placeholder="TP. Hồ Chí Minh" />
+            </label>
+            <label><span className="lock"><Lock size={12} /> Quê quán</span>
+              <input value={f.hometown} onChange={setCap('hometown')} />
+            </label>
+            <label><span className="lock"><Lock size={12} /> Dân tộc</span>
+              <input value={f.ethnicity} onChange={setCap('ethnicity')} placeholder="Kinh" />
+            </label>
+            <label>Quốc tịch
+              <input value={f.nationality} onChange={setCap('nationality')} />
+            </label>
+            <label className="wide"><span className="lock"><Lock size={12} /> Chỗ ở riêng hoặc địa chỉ liên lạc</span>
+              <input value={f.address} onChange={setCap('address')} />
+            </label>
+            <label><span className="lock"><Lock size={12} /> Điện thoại cơ quan (CQ)</span>
+              <input type="tel" value={f.phone_office} onChange={set('phone_office')} />
+            </label>
+            <label><span className="lock"><Lock size={12} /> Điện thoại nhà riêng (NR)</span>
+              <input type="tel" value={f.phone_home} onChange={set('phone_home')} />
+            </label>
+            <label><span className="lock"><Lock size={12} /> Điện thoại di động (DĐ)</span>
+              <input type="tel" value={f.phone} onChange={set('phone')} placeholder="0912 345 678" />
+            </label>
+            <label><span className="lock"><Lock size={12} /> Fax</span>
+              <input value={f.fax} onChange={set('fax')} />
+            </label>
+            <label>Email liên hệ (công khai)
+              <input type="email" value={f.contact_email} onChange={set('contact_email')} />
+            </label>
+          </div>
+        </Collapse>
 
-        <h2>Định danh khoa học và giới thiệu</h2>
-        <div className="form-grid">
-          <label>ORCID
-            <input value={f.orcid} onChange={set('orcid')} placeholder="0000-0000-0000-0000" />
-          </label>
-          <label>Google Scholar
-            <input value={f.google_scholar_url} onChange={set('google_scholar_url')} placeholder="https://scholar.google.com/..." />
-          </label>
-          <label>Website cá nhân
-            <input value={f.website} onChange={set('website')} placeholder="https://..." />
-          </label>
-          <label className="wide">Lĩnh vực quan tâm (cách nhau bằng dấu phẩy)
-            <input value={f.research_interests} onChange={set('research_interests')} placeholder="Trí tuệ nhân tạo, Học máy, Giáo dục số" />
-          </label>
-          <label className="wide">Tiểu sử tóm tắt
-            <textarea rows={4} value={f.bio} onChange={setFirst('bio')} placeholder="Vài dòng giới thiệu về hướng nghiên cứu và thành tựu của bạn..." />
-          </label>
-        </div>
+        <Collapse title="Đơn vị, chức vụ, học hàm, học vị" ctl={ctl}>
+          <div className="form-grid">
+            <label>Đơn vị công tác
+              <select value={f.organization_id} onChange={set('organization_id')}>
+                <option value="">-- Chọn --</option>
+                {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </label>
+            <label className="wide">Chức vụ (hiện tại hoặc trước khi nghỉ hưu)
+              <input value={f.position} onChange={setCap('position')} placeholder="Trưởng bộ môn" />
+            </label>
+            <label>Chức danh khoa học cao nhất
+              <select value={f.academic_title} onChange={set('academic_title')}>
+                <option value="">-- Chọn --</option>
+                {['Trợ giảng', 'Giảng viên', 'Giảng viên chính', 'Nghiên cứu viên', 'Phó giáo sư', 'Giáo sư'].map(x => <option key={x}>{x}</option>)}
+              </select>
+            </label>
+            <label>Năm bổ nhiệm
+              <input type="number" value={f.title_year} onChange={set('title_year')} />
+            </label>
+            <span />
+            <label>Học vị cao nhất
+              <select value={f.academic_degree} onChange={set('academic_degree')}>
+                <option value="">-- Chọn --</option>
+                {['Cử nhân', 'Kỹ sư', 'Thạc sĩ', 'Tiến sĩ', 'Tiến sĩ khoa học'].map(x => <option key={x}>{x}</option>)}
+              </select>
+            </label>
+            <label>Năm nhận học vị
+              <input type="number" value={f.degree_year} onChange={set('degree_year')} />
+            </label>
+            <label>Nước nhận học vị
+              <input value={f.degree_country} onChange={setCap('degree_country')} placeholder="Việt Nam" />
+            </label>
+          </div>
+        </Collapse>
 
-        {msg && <div className={msg.startsWith('Đã') ? 'ok-msg' : 'auth-error'}>{msg}</div>}
-        <button className="btn btn-primary" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu thông tin'}</button>
+        <Collapse title="Định danh khoa học và giới thiệu" ctl={ctl}>
+          <div className="form-grid">
+            <label>ORCID
+              <input value={f.orcid} onChange={set('orcid')} placeholder="0000-0000-0000-0000" />
+            </label>
+            <label>Google Scholar
+              <input value={f.google_scholar_url} onChange={set('google_scholar_url')} placeholder="https://scholar.google.com/..." />
+            </label>
+            <label>Website cá nhân
+              <input value={f.website} onChange={set('website')} placeholder="https://..." />
+            </label>
+            <label className="wide">Lĩnh vực quan tâm (cách nhau bằng dấu phẩy)
+              <input value={f.research_interests} onChange={set('research_interests')} placeholder="Trí tuệ nhân tạo, Học máy, Giáo dục số" />
+            </label>
+            <label className="wide">Tiểu sử tóm tắt
+              <textarea rows={4} value={f.bio} onChange={setFirst('bio')} placeholder="Vài dòng giới thiệu về hướng nghiên cứu và thành tựu của bạn..." />
+            </label>
+          </div>
+        </Collapse>
+
+        {msg && <div className={msg.startsWith('Đã') ? 'ok-msg' : 'auth-error'} style={{ marginTop: 16 }}>{msg}</div>}
+        <div className="save-bar">
+          <button className="btn btn-primary" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu thông tin'}</button>
+          <span className="hint">Nhấn lưu để cập nhật các mục phía trên (I, đơn vị, định danh).</span>
+        </div>
       </form>
 
-      <ItemSection
+      <ItemSection ctl={ctl}
         title="II. Quá trình đào tạo"
         hint="Đại học: chọn Cử nhân/Kỹ sư (nhập bằng thứ hai nếu có). Sau đại học: chọn Thạc sĩ, Tiến sĩ và nhập tên luận văn/luận án."
         table="researcher_education" rid={researcher.id} orderBy="end_year"
@@ -332,7 +359,7 @@ export default function ProfileEdit() {
         })}
       />
 
-      <ItemSection
+      <ItemSection ctl={ctl}
         title="Ngoại ngữ" table="researcher_languages" rid={researcher.id} orderBy="id" asc
         fields={[
           { key: 'language', label: 'Ngoại ngữ *', placeholder: 'Tiếng Anh' },
@@ -341,7 +368,7 @@ export default function ProfileEdit() {
         render={i => ({ main: i.language, sub: i.level ? `Mức độ sử dụng: ${i.level}` : '' })}
       />
 
-      <ItemSection
+      <ItemSection ctl={ctl}
         title="III. Quá trình công tác chuyên môn" hint="Để trống 'Đến năm' nếu bạn vẫn đang làm việc ở đó."
         table="researcher_experience" rid={researcher.id} orderBy="start_year"
         fields={[
@@ -358,7 +385,7 @@ export default function ProfileEdit() {
         })}
       />
 
-      <ItemSection
+      <ItemSection ctl={ctl}
         title="IV. Đề tài nghiên cứu khoa học đã và đang tham gia"
         table="researcher_projects" rid={researcher.id} orderBy="start_year"
         fields={[
@@ -374,7 +401,7 @@ export default function ProfileEdit() {
         })}
       />
 
-      <ItemSection
+      <ItemSection ctl={ctl}
         title="Khen thưởng và giải thưởng"
         table="researcher_awards" rid={researcher.id} orderBy="year"
         fields={[
