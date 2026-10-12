@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Printer, Pencil, Mail, Globe, GraduationCap, FileText, Quote, Users, Link as LinkIcon } from 'lucide-react'
+import {
+  Printer, Pencil, Mail, Globe, GraduationCap, FileText, Quote, Users,
+  Link as LinkIcon, Lock,
+} from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import ExportCvButton from '../components/ExportCvButton'
@@ -14,7 +17,7 @@ const yearRange = (a, b) => (a ? `${a} – ${b || 'nay'}` : '')
 
 export default function ResearcherProfile() {
   const { id } = useParams()
-  const { researcher: me } = useAuth()
+  const { researcher: me, isAdmin } = useAuth()
   const [r, setR] = useState(null)
   const [edu, setEdu] = useState([])
   const [exp, setExp] = useState([])
@@ -22,6 +25,7 @@ export default function ResearcherProfile() {
   const [pubs, setPubs] = useState([])
   const [coauthors, setCoauthors] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [priv, setPriv] = useState(null)
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -55,6 +59,15 @@ export default function ResearcherProfile() {
     load()
   }, [id])
 
+  // Thông tin riêng tư: chỉ nạp khi là admin hoặc chính chủ hồ sơ
+  useEffect(() => {
+    setPriv(null)
+    const mine = me && String(me.id) === String(id)
+    if (!isAdmin && !mine) return
+    supabase.from('researcher_private').select('*').eq('researcher_id', id).maybeSingle()
+      .then(({ data }) => setPriv(data || {}))
+  }, [id, isAdmin, me])
+
   const byYear = useMemo(() => {
     const m = {}
     pubs.forEach(p => { if (p.publication_year) m[p.publication_year] = (m[p.publication_year] || 0) + 1 })
@@ -86,7 +99,7 @@ export default function ResearcherProfile() {
         </div>
         <div className="cv-actions no-print">
           <button className="btn btn-ghost" onClick={() => window.print()}><Printer size={16} /> In / Lưu PDF</button>
-          {isMe && <ExportCvButton researcherId={r.id} />}
+          {(isMe || isAdmin) && <ExportCvButton researcherId={r.id} />}
           {isMe && <Link to="/profile/edit" className="btn btn-primary"><Pencil size={16} /> Chỉnh sửa</Link>}
         </div>
       </section>
@@ -170,6 +183,24 @@ export default function ResearcherProfile() {
               {r.google_scholar_url && <a href={r.google_scholar_url} target="_blank" rel="noreferrer"><LinkIcon size={14} /> Google Scholar</a>}
             </div>
           </div>
+
+          {priv && (
+            <div className="side-card no-print" style={{ marginTop: 16, position: 'static', borderColor: '#bfdbfe', background: '#f8fbff' }}>
+              <h3><Lock size={14} style={{ verticalAlign: '-1px' }} /> Thông tin riêng tư</h3>
+              <p className="muted" style={{ fontSize: 12 }}>Chỉ quản trị viên và chính chủ hồ sơ xem được.</p>
+              <dl>
+                <dt>Ngày sinh</dt><dd>{priv.birth_date ? new Date(priv.birth_date).toLocaleDateString('vi-VN') : '—'}</dd>
+                <dt>Nơi sinh</dt><dd>{priv.birth_place || '—'}</dd>
+                <dt>Quê quán</dt><dd>{priv.hometown || '—'}</dd>
+                <dt>Dân tộc</dt><dd>{priv.ethnicity || '—'}</dd>
+                <dt>Địa chỉ liên lạc</dt><dd>{priv.address || '—'}</dd>
+                <dt>Điện thoại di động (DĐ)</dt><dd>{priv.phone || '—'}</dd>
+                <dt>Điện thoại cơ quan (CQ)</dt><dd>{priv.phone_office || '—'}</dd>
+                <dt>Điện thoại nhà riêng (NR)</dt><dd>{priv.phone_home || '—'}</dd>
+                <dt>Fax</dt><dd>{priv.fax || '—'}</dd>
+              </dl>
+            </div>
+          )}
 
           {byYear.length > 0 && (
             <div className="side-card" style={{ marginTop: 16, position: 'static' }}>
