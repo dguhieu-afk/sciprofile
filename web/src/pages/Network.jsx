@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 
-// Khung vẽ lớn hơn và lực đẩy mạnh hơn để các điểm dãn ra
+// Khung vẽ lớn và lực đẩy mạnh để các điểm dãn ra
 const W = 1300, H = 800
 
 function runLayout(nodes, edges) {
@@ -16,7 +16,7 @@ function runLayout(nodes, edges) {
       for (let j = i + 1; j < n.length; j++) {
         const dx = n[i].x - n[j].x, dy = n[i].y - n[j].y
         const d2 = Math.max(dx * dx + dy * dy, 1), d = Math.sqrt(d2)
-        const f = 70000 / d2 // lực đẩy
+        const f = 70000 / d2
         n[i].vx += (f * dx) / d; n[i].vy += (f * dy) / d
         n[j].vx -= (f * dx) / d; n[j].vy -= (f * dy) / d
       }
@@ -25,12 +25,12 @@ function runLayout(nodes, edges) {
       const a = n[idx.get(e.a)], b = n[idx.get(e.b)]
       const dx = b.x - a.x, dy = b.y - a.y
       const d = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
-      const f = (d - 300) * 0.015 // độ dài đường nối mong muốn
+      const f = (d - 300) * 0.015
       a.vx += (f * dx) / d; a.vy += (f * dy) / d
       b.vx -= (f * dx) / d; b.vy -= (f * dy) / d
     })
     n.forEach(p => {
-      p.vx += (W / 2 - p.x) * 0.004; p.vy += (H / 2 - p.y) * 0.004 // lực kéo về giữa
+      p.vx += (W / 2 - p.x) * 0.004; p.vy += (H / 2 - p.y) * 0.004
       p.x = Math.min(W - 110, Math.max(110, p.x + p.vx * 0.85))
       p.y = Math.min(H - 80, Math.max(70, p.y + p.vy * 0.85))
       p.vx *= 0.6; p.vy *= 0.6
@@ -47,7 +47,7 @@ export default function Network() {
 
   useEffect(() => {
     supabase.from('publication_authors')
-      .select('publication_id,researcher_id,researchers(id,full_name,user_id),publications!inner(status)')
+      .select('publication_id,researcher_id,researchers(id,full_name,user_id,avatar_url),publications!inner(status)')
       .eq('publications.status', 'APPROVED')
       .then(({ data }) => {
         // Chỉ giữ nhà nghiên cứu đã có tài khoản
@@ -60,7 +60,10 @@ export default function Network() {
     const byPub = {}, info = {}
     rows.forEach(r => {
       (byPub[r.publication_id] ||= []).push(r.researcher_id)
-      info[r.researcher_id] ||= { id: r.researcher_id, name: r.researchers.full_name, works: 0 }
+      info[r.researcher_id] ||= {
+        id: r.researcher_id, name: r.researchers.full_name,
+        avatar: r.researchers.avatar_url, works: 0,
+      }
       info[r.researcher_id].works++
     })
     const pair = {}
@@ -99,12 +102,21 @@ export default function Network() {
         <div className="detail" style={{ marginTop: 24 }}>
           <div className="net-box">
             <svg viewBox={`0 0 ${W} ${H}`} width="100%">
+              <defs>
+                {graph.nodes.filter(n => n.avatar).map(n => (
+                  <clipPath id={`clip-${n.id}`} key={n.id}>
+                    <circle cx={n.x} cy={n.y} r={24 + n.works * 3} />
+                  </clipPath>
+                ))}
+              </defs>
+
               {graph.edges.map(e => {
                 const a = pos(e.a), b = pos(e.b)
                 const on = !hot || (hover && (e.a === hover || e.b === hover))
                 return <line key={`${e.a}-${e.b}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
                   stroke="#2563eb" strokeOpacity={on ? 0.7 : 0.1} strokeWidth={2 + e.w * 2} />
               })}
+
               {graph.nodes.map(n => {
                 const r = 24 + n.works * 3
                 const dim = hot && !hot.has(n.id) && n.id !== hover
@@ -112,11 +124,23 @@ export default function Network() {
                   <g key={n.id} style={{ cursor: 'pointer', opacity: dim ? 0.25 : 1 }}
                     onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
                     onClick={() => navigate(`/researchers/${n.id}`)}>
-                    <circle cx={n.x} cy={n.y} r={r} fill="#1d4ed8" stroke="#fff" strokeWidth="4" />
-                    <text x={n.x} y={n.y + 7} textAnchor="middle" fill="#fff" fontSize="20" fontWeight="700">
-                      {n.name.trim().split(' ').pop()[0]}
-                    </text>
-                    <text x={n.x} y={n.y + r + 26} textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="600"
+                    {n.avatar ? (
+                      <>
+                        <circle cx={n.x} cy={n.y} r={r} fill="#dbeafe" />
+                        <image href={n.avatar} x={n.x - r} y={n.y - r} width={r * 2} height={r * 2}
+                          preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${n.id})`} />
+                        <circle cx={n.x} cy={n.y} r={r} fill="none" stroke="#fff" strokeWidth="4" />
+                        <circle cx={n.x} cy={n.y} r={r + 2} fill="none" stroke="#1d4ed8" strokeWidth="2" />
+                      </>
+                    ) : (
+                      <>
+                        <circle cx={n.x} cy={n.y} r={r} fill="#1d4ed8" stroke="#fff" strokeWidth="4" />
+                        <text x={n.x} y={n.y + 7} textAnchor="middle" fill="#fff" fontSize="20" fontWeight="700">
+                          {n.name.trim().split(' ').pop()[0]}
+                        </text>
+                      </>
+                    )}
+                    <text x={n.x} y={n.y + r + 28} textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="600"
                       stroke="#fff" strokeWidth="5" paintOrder="stroke">{n.name}</text>
                   </g>
                 )
