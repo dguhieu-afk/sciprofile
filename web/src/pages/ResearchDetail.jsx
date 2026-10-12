@@ -233,9 +233,15 @@ export default function ResearchDetail() {
               <dt>ISSN</dt><dd>{pub.issn || '—'}</dd>
               <dt>ISBN</dt><dd>{pub.isbn || '—'}</dd>
             </dl>
-            {pub.pdf_url && (
+                        {pub.pdf_url ? (
               <a className="btn btn-primary" style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
                 href={pub.pdf_url} target="_blank" rel="noreferrer">Đọc / tải PDF</a>
+            ) : (
+              <p className="muted" style={{ marginTop: 16, fontSize: 13 }}>Bài này chưa có file đính kèm.</p>
+            )}
+            {pub.doi && (
+              <a className="btn btn-ghost" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}
+                href={`https://doi.org/${pub.doi}`} target="_blank" rel="noreferrer">Mở bài gốc (DOI)</a>
             )}
           </div>
         </aside>
