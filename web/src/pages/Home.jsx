@@ -2,28 +2,24 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Search, BookOpen, Users, FileText, Quote, ArrowRight,
-  GraduationCap, Share2, FlaskConical, ShieldCheck,
+  GraduationCap, Share2, FlaskConical, ShieldCheck, Cpu, Wrench, Briefcase, Leaf,
 } from 'lucide-react'
 import { supabase } from '../supabase'
+import Avatar from '../components/Avatar'
 
 const typeNames = {
   JOURNAL: 'Bài báo', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
   BOOK_CHAPTER: 'Chương sách', THESIS: 'Luận văn',
   RESEARCH_PROJECT: 'Đề tài', OTHER: 'Khác',
 }
-
-const topics = [
-  { icon: <FlaskConical size={22} />, name: 'Trí tuệ nhân tạo' },
-  { icon: <ShieldCheck size={22} />, name: 'An toàn thông tin' },
-  { icon: <GraduationCap size={22} />, name: 'Giáo dục' },
-  { icon: <Share2 size={22} />, name: 'Khoa học dữ liệu' },
-]
+const icons = [FlaskConical, ShieldCheck, GraduationCap, Share2, Cpu, Wrench, Briefcase, Leaf]
 
 export default function Home() {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [papers, setPapers] = useState([])
   const [people, setPeople] = useState([])
+  const [topics, setTopics] = useState([])
   const [counts, setCounts] = useState({ pubs: '…', res: '…', cites: '…', areas: '…' })
 
   useEffect(() => {
@@ -38,7 +34,7 @@ export default function Home() {
 
       const { data: res } = await supabase
         .from('researchers')
-        .select('id,full_name,academic_title,publication_authors(publication_id)')
+        .select('id,avatar_url,full_name,academic_title,publication_authors(publication_id)')
       if (res) {
         setPeople(
           res.map(r => ({ ...r, works: r.publication_authors.length }))
@@ -50,10 +46,24 @@ export default function Home() {
         supabase.from('publications').select('*', { count: 'exact', head: true }).eq('status', 'APPROVED'),
         supabase.from('researchers').select('*', { count: 'exact', head: true }),
         supabase.from('publications').select('citation_count').eq('status', 'APPROVED'),
-        supabase.from('research_areas').select('*', { count: 'exact', head: true }),
+        supabase.from('publication_research_areas')
+          .select('research_area_id,research_areas(id,name),publications!inner(status)')
+          .eq('publications.status', 'APPROVED'),
       ])
+
+      // Đếm số bài theo từng lĩnh vực (chỉ lĩnh vực đã có bài)
+      const map = {}
+      ;(d.data || []).forEach(r => {
+        const ar = r.research_areas
+        if (!ar) return
+        map[ar.id] = map[ar.id] || { id: ar.id, name: ar.name, n: 0 }
+        map[ar.id].n++
+      })
+      const list = Object.values(map).sort((x, y) => y.n - x.n)
+      setTopics(list.slice(0, 8))
+
       const totalCites = (c.data || []).reduce((s, x) => s + x.citation_count, 0)
-      setCounts({ pubs: a.count, res: b.count, cites: totalCites, areas: d.count })
+      setCounts({ pubs: a.count, res: b.count, cites: totalCites, areas: list.length })
     }
     load()
   }, [])
@@ -67,7 +77,7 @@ export default function Home() {
     { icon: <FileText size={22} />, value: counts.pubs, label: 'Công trình nghiên cứu' },
     { icon: <Users size={22} />, value: counts.res, label: 'Nhà nghiên cứu' },
     { icon: <Quote size={22} />, value: counts.cites, label: 'Lượt trích dẫn' },
-    { icon: <BookOpen size={22} />, value: counts.areas, label: 'Lĩnh vực' },
+    { icon: <BookOpen size={22} />, value: counts.areas, label: 'Lĩnh vực có bài' },
   ]
 
   return (
@@ -133,11 +143,12 @@ export default function Home() {
         <section className="section">
           <div className="section-head">
             <h2>Nhà nghiên cứu nổi bật</h2>
+            <Link to="/researchers">Xem tất cả <ArrowRight size={16} /></Link>
           </div>
           <div className="grid-3">
             {people.map(p => (
-                            <Link to={`/researchers/${p.id}`} className="card person" key={p.id}>
-                <div className="avatar">{p.full_name.split(' ').pop()[0]}</div>
+              <Link to={`/researchers/${p.id}`} className="card person" key={p.id}>
+                <Avatar name={p.full_name} url={p.avatar_url} size="lg" />
                 <h3>{p.full_name}</h3>
                 <small>{p.academic_title}</small>
                 <span className="badge">{p.works} công trình</span>
@@ -146,17 +157,23 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="section">
-          <div className="section-head"><h2>Khám phá theo chủ đề</h2></div>
-          <div className="topics">
-            {topics.map(t => (
-              <div className="topic" key={t.name}
-                onClick={() => navigate(`/research?q=${encodeURIComponent(t.name)}`)}>
-                {t.icon}{t.name}
-              </div>
-            ))}
-          </div>
-        </section>
+        {topics.length > 0 && (
+          <section className="section">
+            <div className="section-head"><h2>Khám phá theo chủ đề</h2></div>
+            <div className="topics">
+              {topics.map((t, i) => {
+                const Icon = icons[i % icons.length]
+                return (
+                  <div className="topic" key={t.id} onClick={() => navigate(`/research?area=${t.id}`)}>
+                    <Icon size={22} />
+                    <span>{t.name}</span>
+                    <small className="topic-n">{t.n}</small>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
       </main>
     </>
   )

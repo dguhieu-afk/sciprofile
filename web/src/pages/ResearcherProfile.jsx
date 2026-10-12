@@ -1,3 +1,4 @@
+import Avatar from '../components/Avatar'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
@@ -86,7 +87,7 @@ export default function ResearcherProfile() {
   return (
     <main className="container page cv">
       <section className="cv-head">
-        <div className="avatar big">{r.full_name.trim().split(' ').pop()[0]}</div>
+                <Avatar name={r.full_name} url={r.avatar_url} size="xl" />
         <div className="cv-id">
           <h1>{r.full_name}</h1>
           {sub && <p>{sub}</p>}

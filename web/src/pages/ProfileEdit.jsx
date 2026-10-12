@@ -1,3 +1,4 @@
+import AvatarUpload from '../components/AvatarUpload'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Eye, Lock, ChevronDown } from 'lucide-react'
@@ -229,6 +230,7 @@ export default function ProfileEdit() {
 
       <form onSubmit={save}>
         <Collapse title="I. Lý lịch sơ lược" defaultOpen ctl={ctl}>
+                    <AvatarUpload researcher={researcher} userId={user.id} onDone={reload} />
           <div className="form-grid">
             <label className="wide">Họ và tên *
               <input value={f.full_name} onChange={e => setF({ ...f, full_name: liveCap(e.target.value) })} placeholder="Nguyễn Văn A" />

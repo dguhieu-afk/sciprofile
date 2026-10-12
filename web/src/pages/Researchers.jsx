@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { supabase } from '../supabase'
+import Avatar from '../components/Avatar'
 
 const clean = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
@@ -13,7 +14,7 @@ export default function Researchers() {
 
   useEffect(() => {
     supabase.from('researchers')
-      .select('id,full_name,academic_title,academic_degree,research_interests,organizations(name),publication_authors(publication_id)')
+      .select('id,avatar_url,full_name,academic_title,academic_degree,research_interests,organizations(name),publication_authors(publication_id)')
       .then(({ data }) => {
         setList((data || []).map(r => ({ ...r, works: r.publication_authors.length }))
           .sort((a, b) => b.works - a.works))
@@ -42,7 +43,7 @@ export default function Researchers() {
       <div className="grid-3">
         {shown.map(r => (
           <Link to={`/researchers/${r.id}`} className="card person" key={r.id}>
-            <div className="avatar">{r.full_name.trim().split(' ').pop()[0]}</div>
+            <Avatar name={r.full_name} url={r.avatar_url} size="lg" />
             <h3>{r.full_name}</h3>
             <small>{[r.academic_title, r.academic_degree].filter(Boolean).join(' • ')}</small>
             <small>{r.organizations?.name}</small>

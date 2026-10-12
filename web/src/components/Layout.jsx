@@ -1,3 +1,4 @@
+import Avatar from './Avatar'
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
@@ -40,7 +41,7 @@ export default function Layout() {
             {user ? (
               <div className="user-menu" ref={box}>
                 <button className="user-btn" onClick={() => setOpen(!open)}>
-                  <span className="mini-avatar">{name.trim().split(' ').pop()[0]?.toUpperCase()}</span>
+                                    <Avatar name={name} url={researcher?.avatar_url} size="xs" />
                   <span className="user-name">{name}</span>
                   <ChevronDown size={16} />
                 </button>
