@@ -1,3 +1,4 @@
+import Avatar from '../components/Avatar'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Copy, Check, Calendar, BookOpen, Hash, Quote, Heart, Flag, X } from 'lucide-react'
@@ -71,6 +72,7 @@ export default function ResearchDetail() {
   const [reason, setReason] = useState(reasons[0])
   const [desc, setDesc] = useState('')
   const [reportMsg, setReportMsg] = useState('')
+    const [poster, setPoster] = useState(null)
 
   useEffect(() => {
     setLoading(true)
@@ -102,6 +104,14 @@ export default function ResearchDetail() {
       .then(({ data }) => setFav(Boolean(data)))
   }, [user, id])
 
+    // Lấy hồ sơ người đăng bài (tài khoản đã tạo công trình)
+  useEffect(() => {
+    setPoster(null)
+    if (!pub?.created_by) return
+    supabase.from('researchers').select('id,full_name,avatar_url,academic_title')
+      .eq('user_id', pub.created_by).maybeSingle()
+      .then(({ data }) => setPoster(data))
+  }, [pub])
   const citations = useMemo(
     () => pub ? makeCitations(pub, pub.authors.map(a => a.full_name)) : {},
     [pub]
@@ -243,6 +253,26 @@ export default function ResearchDetail() {
               <a className="btn btn-ghost" style={{ marginTop: 10, width: '100%', justifyContent: 'center' }}
                 href={`https://doi.org/${pub.doi}`} target="_blank" rel="noreferrer">Mở bài gốc (DOI)</a>
             )}
+          </div>
+                    <div className="side-card" style={{ marginTop: 16, position: 'static' }}>
+            <h3>Người đăng bài</h3>
+            {poster ? (
+              <Link to={`/researchers/${poster.id}`} className="poster">
+                <Avatar name={poster.full_name} url={poster.avatar_url} size="md" />
+                <div>
+                  <b>{poster.full_name}</b>
+                  <div className="muted" style={{ fontSize: 13 }}>{poster.academic_title || 'Nhà nghiên cứu'}</div>
+                </div>
+              </Link>
+            ) : (
+              <p className="muted">Không có thông tin người đăng.</p>
+            )}
+            <dl>
+              <dt>Ngày đăng</dt>
+              <dd>{new Date(pub.created_at).toLocaleDateString('vi-VN')}</dd>
+              <dt>Cập nhật lần cuối</dt>
+              <dd>{new Date(pub.updated_at).toLocaleDateString('vi-VN')}</dd>
+            </dl>
           </div>
         </aside>
       </div>

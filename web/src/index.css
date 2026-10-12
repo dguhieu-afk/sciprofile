@@ -305,3 +305,6 @@ td select { height: 36px; border: 1px solid var(--line); border-radius: 8px; pad
 .cv-head .av-fallback { background: rgba(255,255,255,.18); }
 .avatar-up { display: flex; align-items: center; gap: 18px; margin-bottom: 22px; flex-wrap: wrap; }
 .user-btn .av { margin-right: 0; }
+.av-md { width: 48px; height: 48px; font-size: 18px; }
+.poster { display: flex; align-items: center; gap: 12px; margin: 10px 0 4px; }
+.poster:hover b { color: var(--teal-700); }
