@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Check, X, ShieldCheck, Users, FileClock, ScrollText } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
+import { useUI } from '../ui'
+import { approvePub } from '../review'
+import Loading from '../components/Loading'
 
 const typeNames = {
   JOURNAL: 'Bài báo', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
@@ -12,6 +15,7 @@ const fmt = d => new Date(d).toLocaleString('vi-VN')
 
 export default function Admin() {
   const { user, profile, isAdmin, ready } = useAuth()
+  const { confirm, prompt, toast } = useUI()
   const navigate = useNavigate()
   const [tab, setTab] = useState('pending')
   const [pending, setPending] = useState([])
@@ -28,7 +32,7 @@ export default function Admin() {
   async function loadAll() {
     const [p, u, l, a, pe, us] = await Promise.all([
       supabase.from('publications')
-        .select('id,title,abstract,publication_type,publication_year,journal,created_at,publication_authors(author_order,researchers(full_name))')
+        .select('id,title,abstract,doi,publication_type,publication_year,journal,created_at,publication_authors(author_order,researchers(full_name))')
         .eq('status', 'PENDING').order('created_at'),
       supabase.from('profiles').select('id,email,role,created_at,researchers(full_name)').order('created_at', { ascending: false }),
       supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
@@ -47,28 +51,40 @@ export default function Admin() {
     })
 
   async function approve(p) {
-    const { error } = await supabase.from('publications').update({ status: 'APPROVED', admin_note: null }).eq('id', p.id)
-    if (error) { alert(error.message); return }
-    await log('APPROVE', 'PUBLICATION', p.id, { status: 'PENDING' }, { status: 'APPROVED' })
-    loadAll()
+    try {
+      const c = await approvePub(p, user.id)
+      toast(c != null ? `Đã duyệt công trình (trích dẫn xác thực: ${c}).` : 'Đã duyệt công trình.', 'success')
+      loadAll()
+    } catch (e) { toast('Không duyệt được: ' + e.message, 'error') }
   }
+
   async function reject(p) {
-    const note = prompt('Lý do từ chối (người nộp sẽ thấy):')
+    const note = await prompt({
+      title: 'Từ chối công trình', message: p.title,
+      label: 'Lý do từ chối (người nộp sẽ thấy)', placeholder: 'Ví dụ: Thiếu tóm tắt, sai thông tin tác giả...',
+      confirmText: 'Từ chối', danger: true,
+    })
     if (note === null) return
     const { error } = await supabase.from('publications').update({ status: 'REJECTED', admin_note: note || 'Chưa đạt yêu cầu' }).eq('id', p.id)
-    if (error) { alert(error.message); return }
+    if (error) { toast(error.message, 'error'); return }
     await log('REJECT', 'PUBLICATION', p.id, { status: 'PENDING' }, { status: 'REJECTED', note })
-    loadAll()
-  }
-  async function changeRole(u, role) {
-    if (!confirm(`Đổi vai trò của ${u.email} thành ${role}?`)) return
-    const { error } = await supabase.from('profiles').update({ role }).eq('id', u.id)
-    if (error) { alert(error.message); return }
-    await log('CHANGE_ROLE', 'USER', u.id, { role: u.role }, { role })
+    toast('Đã từ chối công trình.', 'success')
     loadAll()
   }
 
-  if (!isAdmin) return <main className="container page"><div className="empty">Đang kiểm tra quyền...</div></main>
+  async function changeRole(u, role) {
+    const ok = await confirm({
+      title: 'Đổi vai trò người dùng?', message: `${u.email}: ${u.role} → ${role}`, confirmText: 'Đổi vai trò',
+    })
+    if (!ok) { loadAll(); return }
+    const { error } = await supabase.from('profiles').update({ role }).eq('id', u.id)
+    if (error) { toast(error.message, 'error'); return }
+    await log('CHANGE_ROLE', 'USER', u.id, { role: u.role }, { role })
+    toast('Đã đổi vai trò.', 'success')
+    loadAll()
+  }
+
+  if (!isAdmin) return <main className="container page"><Loading text="Đang kiểm tra quyền..." /></main>
 
   const nameOf = u => (Array.isArray(u.researchers) ? u.researchers[0] : u.researchers)?.full_name || '—'
 

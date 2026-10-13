@@ -3,6 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Check, X, AlertTriangle, FileText } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
+import { useUI } from '../ui'
+import { openFile } from '../storage'
+import { approvePub } from '../review'
+import Loading from '../components/Loading'
 
 const typeNames = {
   JOURNAL: 'Bài báo tạp chí', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
@@ -15,6 +19,7 @@ const fmt = d => new Date(d).toLocaleString('vi-VN')
 export default function AdminReview() {
   const { id } = useParams()
   const { user, profile, isAdmin, ready } = useAuth()
+  const { prompt, toast } = useUI()
   const navigate = useNavigate()
   const [p, setP] = useState(null)
   const [owner, setOwner] = useState('')
@@ -39,11 +44,10 @@ export default function AdminReview() {
           publication_keywords(keywords(name))`).eq('id', id).maybeSingle()
         if (error) throw error
         setP(data)
-
         if (data) {
           if (data.created_by) {
-            const { data: owner } = await supabase.from('profiles').select('email').eq('id', data.created_by).maybeSingle()
-            setOwner(owner?.email || '')
+            const { data: o } = await supabase.from('profiles').select('email').eq('id', data.created_by).maybeSingle()
+            setOwner(o?.email || '')
           }
           const { data: sim } = await supabase.rpc('find_similar_publications', { t: data.title })
           setSimilar((sim || []).filter(s => String(s.id) !== String(id)))
@@ -57,27 +61,37 @@ export default function AdminReview() {
     load()
   }, [id, isAdmin])
 
-  const log = (action, oldV, newV) => supabase.from('audit_logs').insert({
-    user_id: user.id, action, entity_type: 'PUBLICATION', entity_id: String(id), old_value: oldV, new_value: newV,
-  })
-
   async function approve() {
-    const { error } = await supabase.from('publications').update({ status: 'APPROVED', admin_note: null }).eq('id', id)
-    if (error) { alert(error.message); return }
-    await log('APPROVE', { status: 'PENDING' }, { status: 'APPROVED' })
-    navigate('/admin')
+    try {
+      const c = await approvePub(p, user.id)
+      toast(c != null ? `Đã duyệt công trình (trích dẫn xác thực: ${c}).` : 'Đã duyệt công trình.', 'success')
+      navigate('/admin')
+    } catch (e) { toast('Không duyệt được: ' + e.message, 'error') }
   }
+
   async function reject() {
-    const note = prompt('Lý do từ chối (người nộp sẽ thấy):')
+    const note = await prompt({
+      title: 'Từ chối công trình', message: p.title,
+      label: 'Lý do từ chối (người nộp sẽ thấy)', placeholder: 'Ví dụ: Thiếu tóm tắt, sai thông tin tác giả...',
+      confirmText: 'Từ chối', danger: true,
+    })
     if (note === null) return
     const { error } = await supabase.from('publications').update({ status: 'REJECTED', admin_note: note || 'Chưa đạt yêu cầu' }).eq('id', id)
-    if (error) { alert(error.message); return }
-    await log('REJECT', { status: 'PENDING' }, { status: 'REJECTED', note })
+    if (error) { toast(error.message, 'error'); return }
+    await supabase.from('audit_logs').insert({
+      user_id: user.id, action: 'REJECT', entity_type: 'PUBLICATION', entity_id: String(id),
+      old_value: { status: 'PENDING' }, new_value: { status: 'REJECTED', note },
+    })
+    toast('Đã từ chối công trình.', 'success')
     navigate('/admin')
   }
 
-  if (!isAdmin) return <main className="container page"><div className="empty">Đang kiểm tra quyền...</div></main>
-  if (loading) return <main className="container page"><div className="empty">Đang tải...</div></main>
+  async function viewFile() {
+    try { await openFile(p.pdf_url) } catch (e) { toast(e.message, 'error') }
+  }
+
+  if (!isAdmin) return <main className="container page"><Loading text="Đang kiểm tra quyền..." /></main>
+  if (loading) return <main className="container page"><Loading /></main>
   if (loadErr) return (
     <main className="container page">
       <Link to="/admin" className="back"><ArrowLeft size={16} /> Quay lại</Link>
@@ -167,10 +181,13 @@ export default function AdminReview() {
           {row('ISBN', p.isbn)}
           {row('Số trích dẫn', p.citation_count)}
         </dl>
+        {p.status === 'PENDING' && p.doi && (
+          <p className="hint">Khi duyệt, hệ thống tự xác nhận số trích dẫn từ Crossref theo DOI.</p>
+        )}
 
         <h2>Tài liệu đính kèm</h2>
         {p.pdf_url
-          ? <a className="btn btn-ghost" href={p.pdf_url} target="_blank" rel="noreferrer"><FileText size={16} /> Mở file để kiểm tra</a>
+          ? <button type="button" className="btn btn-ghost" onClick={viewFile}><FileText size={16} /> Mở file để kiểm tra</button>
           : <p className="muted">Không có file đính kèm.</p>}
 
         {p.status === 'PENDING' && (

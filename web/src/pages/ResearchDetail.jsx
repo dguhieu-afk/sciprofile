@@ -1,3 +1,5 @@
+import { useUI } from '../ui'
+import { openFile } from '../storage'
 import Avatar from '../components/Avatar'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
@@ -62,6 +64,7 @@ export default function ResearchDetail() {
   const { id } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { toast } = useUI()
   const [pub, setPub] = useState(null)
   const [all, setAll] = useState([])
   const [loading, setLoading] = useState(true)

@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { FileDown } from 'lucide-react'
+import { useUI } from '../ui'
 
 export default function ExportCvButton({ researcherId, className = 'btn btn-primary' }) {
+  const { toast } = useUI()
   const [busy, setBusy] = useState(false)
   async function go() {
     setBusy(true)
     try {
       const { downloadCV } = await import('../exportCV')
       await downloadCV(researcherId)
+      toast('Đã tạo file CV.', 'success')
     } catch (e) {
-      alert('Không xuất được CV: ' + e.message)
+      toast('Không xuất được CV: ' + e.message, 'error')
     }
     setBusy(false)
   }

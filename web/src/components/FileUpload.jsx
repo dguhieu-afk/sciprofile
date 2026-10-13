@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { Upload, X, FileText } from 'lucide-react'
 import { supabase } from '../supabase'
+import { openFile } from '../storage'
 
 const MAX = 20 * 1024 * 1024
 const OK = [
   'application/pdf', 'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
+const isExternal = v => /^https?:\/\//i.test(v || '')
 
+// value: đường dẫn trong kho riêng tư, hoặc link ngoài (Google Drive...)
 export default function FileUpload({ value, onChange, userId }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -27,14 +30,16 @@ export default function FileUpload({ value, onChange, userId }) {
     const { error } = await supabase.storage.from('documents').upload(path, file, { contentType: file.type })
     setBusy(false)
     if (error) { setErr('Tải lên thất bại: ' + error.message); return }
-    onChange(supabase.storage.from('documents').getPublicUrl(path).data.publicUrl)
+    onChange(path)
   }
 
   async function remove() {
-    const marker = '/documents/'
-    const i = value.indexOf(marker)
-    if (i >= 0) await supabase.storage.from('documents').remove([decodeURIComponent(value.slice(i + marker.length))])
+    if (value && !isExternal(value)) await supabase.storage.from('documents').remove([value])
     onChange('')
+  }
+
+  async function view() {
+    try { await openFile(value) } catch (e) { setErr(e.message) }
   }
 
   const fileName = value ? decodeURIComponent(value.split('/').pop()) : ''
@@ -45,7 +50,9 @@ export default function FileUpload({ value, onChange, userId }) {
       {value ? (
         <div className="upload-done">
           <FileText size={18} />
-          <a href={value} target="_blank" rel="noreferrer">{fileName}</a>
+          <button type="button" className="link-btn" style={{ flex: 1, textAlign: 'left', wordBreak: 'break-all' }} onClick={view}>
+            {isExternal(value) ? value : fileName}
+          </button>
           <button type="button" className="icon-btn" onClick={remove} title="Gỡ file"><X size={16} /></button>
         </div>
       ) : (

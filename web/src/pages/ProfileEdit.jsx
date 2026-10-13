@@ -1,3 +1,4 @@
+import { useUI } from '../ui'
 import AvatarUpload from '../components/AvatarUpload'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -33,6 +34,7 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ct
   const [items, setItems] = useState([])
   const [draft, setDraft] = useState(blank)
   const [err, setErr] = useState('')
+  const { confirm } = useUI()
 
   async function load() {
     const { data } = await supabase.from(table).select('*')
@@ -56,7 +58,7 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ct
   }
 
   async function remove(id) {
-    if (!confirm('Xóa mục này?')) return
+           if (!(await confirm({ title: 'Xóa mục này?', message: 'Thao tác này không thể hoàn tác.', confirmText: 'Xóa', danger: true }))) return
     await supabase.from(table).delete().eq('id', id)
     load()
   }
@@ -164,7 +166,7 @@ export default function ProfileEdit() {
   async function save(e) {
     e.preventDefault()
     setMsg('')
-    const name = titleCase(f.full_name)
+           const name = liveCap(f.full_name.trim().replace(/\s+/g, ' '))
     if (name.length < 2) { setMsg('Họ tên không được để trống.'); return }
 
     let birthYear = null

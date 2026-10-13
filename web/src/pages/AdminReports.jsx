@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
+import { useUI } from '../ui'
+import Loading from '../components/Loading'
 
 const fmt = d => new Date(d).toLocaleString('vi-VN')
 
 export default function AdminReports() {
   const { user, profile, isAdmin, ready } = useAuth()
+  const { confirm, prompt, toast } = useUI()
   const navigate = useNavigate()
   const [list, setList] = useState([])
   const [loading, setLoading] = useState(true)
@@ -26,29 +29,44 @@ export default function AdminReports() {
   }
   useEffect(() => { if (isAdmin) load() }, [isAdmin])
 
-  async function resolve(r, status) {
-    const note = prompt('Ghi chú xử lý (không bắt buộc):') ?? ''
-    await supabase.from('reports').update({
+  async function finish(r, status, note) {
+    const { error } = await supabase.from('reports').update({
       status, admin_note: note || null, resolved_at: new Date().toISOString(),
     }).eq('id', r.id)
+    if (error) { toast(error.message, 'error'); return false }
     await supabase.from('audit_logs').insert({
       user_id: user.id, action: 'RESOLVE_REPORT', entity_type: 'REPORT', entity_id: String(r.id),
       old_value: { status: r.status }, new_value: { status },
     })
-    load()
+    return true
+  }
+
+  async function resolve(r, status) {
+    const note = await prompt({
+      title: status === 'RESOLVED' ? 'Đánh dấu đã xử lý' : 'Bỏ qua báo cáo',
+      label: 'Ghi chú (không bắt buộc)', confirmText: 'Lưu',
+    })
+    if (note === null) return
+    if (await finish(r, status, note)) { toast('Đã cập nhật báo cáo.', 'success'); load() }
   }
 
   async function archive(r) {
-    if (!confirm('Gỡ công trình này khỏi kho công khai (chuyển sang lưu trữ)?')) return
-    await supabase.from('publications').update({ status: 'ARCHIVED' }).eq('id', r.publication_id)
+    const ok = await confirm({
+      title: 'Gỡ công trình khỏi kho công khai?',
+      message: 'Công trình sẽ chuyển sang trạng thái lưu trữ và không còn hiển thị với mọi người.',
+      confirmText: 'Gỡ công trình', danger: true,
+    })
+    if (!ok) return
+    const { error } = await supabase.from('publications').update({ status: 'ARCHIVED' }).eq('id', r.publication_id)
+    if (error) { toast(error.message, 'error'); return }
     await supabase.from('audit_logs').insert({
       user_id: user.id, action: 'ARCHIVE', entity_type: 'PUBLICATION', entity_id: String(r.publication_id),
       old_value: { status: 'APPROVED' }, new_value: { status: 'ARCHIVED' },
     })
-    resolve(r, 'RESOLVED')
+    if (await finish(r, 'RESOLVED', 'Đã gỡ công trình khỏi kho')) { toast('Đã gỡ công trình.', 'success'); load() }
   }
 
-  if (!isAdmin) return <main className="container page"><div className="empty">Đang kiểm tra quyền...</div></main>
+  if (!isAdmin) return <main className="container page"><Loading text="Đang kiểm tra quyền..." /></main>
 
   return (
     <main className="container page">
@@ -57,7 +75,7 @@ export default function AdminReports() {
         <p>Các báo cáo do người dùng gửi về công trình trong kho.</p>
       </div>
       <div className="list" style={{ marginTop: 24 }}>
-        {loading && <div className="empty">Đang tải...</div>}
+        {loading && <Loading />}
         {!loading && list.length === 0 && <div className="empty">Chưa có báo cáo nào.</div>}
         {list.map(r => (
           <article className="card result" key={r.id}>

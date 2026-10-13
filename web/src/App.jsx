@@ -1,3 +1,4 @@
+   import NotFound from './pages/NotFound'
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
@@ -17,12 +18,14 @@ import Favorites from './pages/Favorites'
 import Network from './pages/Network'
 import Stats from './pages/Stats'
 
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<Layout />}>
+           <Route path="*" element={<NotFound />} />
         <Route path="/" element={<Home />} />
         <Route path="/research" element={<Research />} />
         <Route path="/research/:id" element={<ResearchDetail />} />

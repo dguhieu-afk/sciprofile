@@ -1,0 +1,13 @@
+name: keepalive
+on:
+  schedule:
+    - cron: '0 3 */3 * *'   # 3 ngày một lần
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gọi database để giữ project hoạt động
+        run: |
+          curl -fsS "${{ secrets.SUPABASE_URL }}/rest/v1/research_areas?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}"

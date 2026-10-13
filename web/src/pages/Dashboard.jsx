@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Send, Trash2, FileText, Clock, CheckCircle2, XCircle, Info } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
+import { useUI } from '../ui'
+import Loading from '../components/Loading'
 
 const statusInfo = {
   DRAFT: { label: 'Bản nháp', cls: 's-draft' },
@@ -15,6 +17,7 @@ const WAIT_NOTE = 'Chúng tôi đã ghi nhận dữ liệu của bạn. Chúng t
 
 export default function Dashboard() {
   const { user, researcher, ready } = useAuth()
+  const { confirm, toast } = useUI()
   const navigate = useNavigate()
   const location = useLocation()
   const [items, setItems] = useState([])
@@ -34,14 +37,28 @@ export default function Dashboard() {
   useEffect(() => { load() }, [user]) // eslint-disable-line
 
   async function submitForReview(id) {
-    if (!confirm('Gửi công trình này cho quản trị viên kiểm duyệt?')) return
-    await supabase.from('publications').update({ status: 'PENDING', admin_note: null }).eq('id', id)
+    const ok = await confirm({
+      title: 'Gửi kiểm duyệt?',
+      message: 'Công trình sẽ được gửi cho quản trị viên xem xét. Trong lúc chờ duyệt bạn không sửa được bài.',
+      confirmText: 'Gửi duyệt',
+    })
+    if (!ok) return
+    const { error } = await supabase.from('publications').update({ status: 'PENDING', admin_note: null }).eq('id', id)
+    if (error) { toast('Không gửi được: ' + error.message, 'error'); return }
     setJustSent(true)
+    toast('Đã gửi kiểm duyệt.', 'success')
     load()
   }
+
   async function remove(id) {
-    if (!confirm('Xóa bản nháp này?')) return
-    await supabase.from('publications').delete().eq('id', id)
+    const ok = await confirm({
+      title: 'Xóa bản nháp này?', message: 'Thao tác này không thể hoàn tác.',
+      confirmText: 'Xóa', danger: true,
+    })
+    if (!ok) return
+    const { error } = await supabase.from('publications').delete().eq('id', id)
+    if (error) { toast('Không xóa được: ' + error.message, 'error'); return }
+    toast('Đã xóa bản nháp.', 'success')
     load()
   }
 
@@ -59,9 +76,7 @@ export default function Dashboard() {
       </div>
 
       {justSent && (
-        <div className="ok-msg note-big">
-          <Info size={18} /> <span>{WAIT_NOTE}</span>
-        </div>
+        <div className="ok-msg note-big"><Info size={18} /> <span>{WAIT_NOTE}</span></div>
       )}
 
       <div className="cv-stats" style={{ marginTop: 24 }}>
@@ -72,7 +87,7 @@ export default function Dashboard() {
       </div>
 
       <div className="list">
-        {loading && <div className="empty">Đang tải...</div>}
+        {loading && <Loading />}
         {!loading && items.length === 0 && (
           <div className="empty">Bạn chưa có công trình nào. Bấm <b>Thêm công trình</b> để bắt đầu.</div>
         )}

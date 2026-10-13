@@ -1,3 +1,4 @@
+import { useRouteTitle } from '../useRouteTitle'
 import Avatar from './Avatar'
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
@@ -10,6 +11,7 @@ import { useAuth } from '../AuthContext'
 export default function Layout() {
   const { user, researcher, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
+  useRouteTitle()
   const [open, setOpen] = useState(false)
   const box = useRef(null)
 
