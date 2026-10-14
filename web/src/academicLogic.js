@@ -35,3 +35,28 @@ export function validateEducation(items = []) {
   }
   return ''
 }
+
+// Chỉ PGS/GS được ghi nhận là học hàm. Chức danh nghề nghiệp là thông tin riêng.
+export const ACADEMIC_RANKS = ['Phó giáo sư', 'Giáo sư']
+export const PROFESSIONAL_TITLES = ['Trợ giảng', 'Giảng viên', 'Giảng viên chính', 'Giảng viên cao cấp', 'Nghiên cứu viên', 'Nghiên cứu viên chính', 'Nghiên cứu viên cao cấp']
+export const isAcademicRank = v => ACADEMIC_RANKS.includes(String(v || '').trim())
+
+// Nhắc người nhập kiểm tra những mốc hiếm gặp, không tự kết luận rằng bằng cấp là giả.
+export function academicWarnings({ birthDate, education = [], academicRank, rankYear, professionalYear } = {}) {
+  const messages = []
+  const birth = birthDate ? Number(String(birthDate).slice(0, 4)) : null
+  const completed = education.filter(e => DEGREE_RANK[e.degree] && validYear(yearNumber(e.end_year)))
+  if (birth && validYear(birth)) {
+    for (const e of completed) {
+      const age = Number(e.end_year) - birth
+      if (age < 18) messages.push(`Bằng ${e.degree} năm ${e.end_year} được cấp khi khoảng ${age} tuổi; vui lòng kiểm tra hồ sơ gốc.`)
+    }
+    if (rankYear && Number(rankYear) - birth < 25) messages.push(`Năm công nhận ${academicRank} (${rankYear}) cần đối chiếu quyết định và ngày sinh.`)
+    if (professionalYear && Number(professionalYear) - birth < 18) messages.push(`Năm bổ nhiệm chức danh nghề nghiệp ${professionalYear} cần được kiểm tra.`)
+  }
+  const phd = completed.filter(e => DEGREE_RANK[e.degree] >= 3).sort((a,b)=>Number(a.end_year)-Number(b.end_year))[0]
+  if (isAcademicRank(academicRank) && phd && rankYear && Number(rankYear) < Number(phd.end_year))
+    messages.push(`Năm công nhận ${academicRank} (${rankYear}) sớm hơn năm cấp bằng ${phd.degree} (${phd.end_year}); cần kiểm tra lại.`)
+  if (isAcademicRank(academicRank) && !phd) messages.push('Đã khai học hàm PGS/GS nhưng chưa có văn bằng Tiến sĩ trong quá trình đào tạo; vui lòng bổ sung minh chứng.')
+  return [...new Set(messages)]
+}

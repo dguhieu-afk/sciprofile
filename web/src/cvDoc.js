@@ -1,4 +1,4 @@
-import { highestCompletedDegree, sortEducation } from './academicLogic'
+import { highestCompletedDegree, sortEducation, isAcademicRank, PROFESSIONAL_TITLES } from './academicLogic'
 import {
   Document, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType,
   WidthType, BorderStyle, LevelFormat, Header, PageNumber,
@@ -46,7 +46,8 @@ const mkTable = (widths, rows, bordered) =>
 function kv(rows) {
   const [a, b] = [4800, 4498]
   const label = (l, v) => para([t(`${l}: `), t(v || '')], { spacing: { after: 0, line: 300 } })
-  return mkTable([a, b], rows.map(r =>
+  const visible = rows.map(r => r.filter(([_, v]) => v !== '' && v !== null && v !== undefined && String(v).trim() !== '')).filter(r => r.length)
+  return mkTable([a, b], visible.map(r =>
     r.length === 1
       ? new TableRow({ children: [cell(label(...r[0]), W, { columnSpan: 2, borders: noBorders })] })
       : new TableRow({ children: [
@@ -96,8 +97,11 @@ export function buildCvDoc(d) {
   const ths = orderedEducation.filter(e => e.degree === 'Thạc sĩ').sort(byEnd).at(-1) || {}
   const ts = orderedEducation.filter(e => e.degree === 'Tiến sĩ').sort(byEnd).at(-1) || {}
 
-  const phones = `CQ: ${p.phone_office || ''}      NR: ${p.phone_home || ''}      DĐ: ${p.phone || ''}`
-  const degreeYear = [highest?.end_year || r.degree_year, highest?.country || r.degree_country].filter(Boolean).join(', ')
+  const phones = [['CQ',p.phone_office], ['NR',p.phone_home], ['DĐ',p.phone]].filter(([,v]) => v).map(([l,v]) => `${l}: ${v}`).join('     ')
+  const reportedHighest = edu.length === 0 ? r.academic_degree : null
+  const degreeYear = [highest?.end_year || (edu.length === 0 ? r.degree_year : null), highest?.country || (edu.length === 0 ? r.degree_country : null)].filter(Boolean).join(', ')
+  const academicRank = isAcademicRank(r.academic_title) ? r.academic_title : ''
+  const professional = r.professional_title || (PROFESSIONAL_TITLES.includes(r.academic_title) ? r.academic_title : '')
 
   const children = [
     para([t('BỘ GIÁO DỤC VÀ ĐÀO TẠO', { bold: true })]),
@@ -127,8 +131,9 @@ export function buildCvDoc(d) {
       [['Họ và tên', r.full_name], ['Giới tính', r.gender]],
       [['Ngày, tháng, năm sinh', fmtDate(p.birth_date)], ['Nơi sinh', p.birth_place]],
       [['Quê quán', p.hometown], ['Dân tộc', p.ethnicity]],
-      [['Học vị cao nhất', highest?.degree || r.academic_degree], ['Năm, nước nhận học vị', degreeYear]],
-      [['Chức danh khoa học cao nhất', r.academic_title], ['Năm bổ nhiệm', r.title_year]],
+      [['Học vị cao nhất', highest?.degree || reportedHighest || 'Chưa có dữ liệu đào tạo xác minh'], ['Năm, nước nhận học vị', degreeYear]],
+      [['Học hàm được công nhận', academicRank], ['Năm công nhận học hàm', academicRank && r.title_year]],
+      [['Chức danh nghề nghiệp', professional], ['Năm bổ nhiệm chức danh nghề nghiệp', professional && r.professional_title_year]],
       [['Chức vụ (hiện tại hoặc trước khi nghỉ hưu)', r.position]],
       [['Đơn vị công tác (hiện tại hoặc trước khi nghỉ hưu)', orgChain]],
       [['Chỗ ở riêng hoặc địa chỉ liên lạc', p.address]],
@@ -144,29 +149,27 @@ export function buildCvDoc(d) {
       orderedEducation.map((e, i) => [String(i + 1), e.degree || '', yrs(e.start_year, e.end_year), e.major || '', e.institution || '', e.country || '']), 6),
     ...orderedEducation.filter(e => e.thesis_title).map(e => dash(`${e.degree} (${e.end_year || ''}) – Luận văn/luận án: ${e.thesis_title}`)),
 
-    bold('1. Đại học:'),
-    kv([
+    ...(uni.length ? [bold('1. Đại học:')] : []),
+    ...(uni.length ? [kv([
       [['Hệ đào tạo', u1.training_system]],
       [['Nơi đào tạo', u1.institution]],
       [['Ngành học', u1.major]],
       [['Nước đào tạo', u1.country], ['Năm tốt nghiệp', u1.end_year]],
       [['Bằng đại học 2', u2 ? [u2.major, u2.institution].filter(Boolean).join(' – ') : ''], ['Năm tốt nghiệp', u2?.end_year]],
-    ]),
-    bold('2. Sau đại học'),
-    dash(`Thạc sĩ ngành/chuyên ngành: ${ths.major || ''}`),
-    kv([[['Năm cấp bằng', ths.end_year], ['Nơi đào tạo', ths.institution]]]),
-    dash(`Tên luận văn: ${ths.thesis_title || ''}`),
-    dash(`Tiến sĩ chuyên ngành: ${ts.major || ''}`),
-    kv([[['Năm cấp bằng', ts.end_year], ['Nơi đào tạo', ts.institution]]]),
-    dash(`Tên luận án: ${ts.thesis_title || ''}`),
+    ])] : []),
+    ...((ths.degree || ts.degree) ? [bold('2. Sau đại học')] : []),
+    ...(ths.degree ? [dash(`Thạc sĩ ngành/chuyên ngành: ${ths.major || 'Chưa khai báo'}`), kv([[['Năm cấp bằng', ths.end_year], ['Nơi đào tạo', ths.institution]]])] : []),
+    ...(ths.thesis_title ? [dash(`Tên luận văn: ${ths.thesis_title}`)] : []),
+    ...(ts.degree ? [dash(`Tiến sĩ chuyên ngành: ${ts.major || 'Chưa khai báo'}`), kv([[['Năm cấp bằng', ts.end_year], ['Nơi đào tạo', ts.institution]]])] : []),
+    ...(ts.thesis_title ? [dash(`Tên luận án: ${ts.thesis_title}`)] : []),
 
     para([t('')], { spacing: { after: 0 } }),
-    mkTable([2500, 3250, 3548],
-      (langs.length ? langs : [{ language: '', level: '' }]).map((l, i) => new TableRow({ children: [
+    ...(langs.length ? [mkTable([2500, 3250, 3548],
+      langs.map((l, i) => new TableRow({ children: [
         cell(para([t(i === 0 ? '3. Ngoại ngữ:' : '', { bold: true })], { spacing: { after: 0 } }), 2500, { borders: noBorders }),
         cell(para(`${i + 1}. ${l.language || ''}`, { spacing: { after: 0 } }), 3250, { borders: noBorders }),
         cell(para(`Mức độ sử dụng: ${l.level || ''}`, { spacing: { after: 0 } }), 3548, { borders: noBorders }),
-      ] })), false),
+      ] })), false)] : []),
 
     para([t('')], { spacing: { after: 60 } }),
     bold('III. QUÁ TRÌNH CÔNG TÁC CHUYÊN MÔN'),
@@ -195,7 +198,7 @@ export function buildCvDoc(d) {
         para([t(dateLine, { italics: true })], { alignment: AlignmentType.CENTER }),
         para([t('Người khai kí tên', { bold: true })], { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
         para([t('(Ghi rõ chức danh, học vị)', { italics: true })], { alignment: AlignmentType.CENTER, spacing: { after: 900 } }),
-        para([t([r.academic_title, r.academic_degree].filter(Boolean).join(', '), { italics: true })], { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
+        para([t([academicRank, highest?.degree || reportedHighest].filter(Boolean).join(', '), { italics: true })], { alignment: AlignmentType.CENTER, spacing: { after: 0 } }),
         para([t(r.full_name, { bold: true })], { alignment: AlignmentType.CENTER }),
       ], 5698, { borders: noBorders }),
     ] })], false),

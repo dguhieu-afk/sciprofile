@@ -7,7 +7,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import { liveCap, titleCase, capFirst } from '../utils'
 import ExportCvButton from '../components/ExportCvButton'
-import { highestCompletedDegree, sortEducation, validateEducation } from '../academicLogic'
+import { highestCompletedDegree, sortEducation, validateEducation, academicWarnings, ACADEMIC_RANKS, PROFESSIONAL_TITLES, isAcademicRank } from '../academicLogic'
 import './ProfileEditProfessional.css'
 
 const yearRange = (a, b) => (a ? `${a} – ${b || 'nay'}` : '')
@@ -136,6 +136,8 @@ export default function ProfileEdit() {
   const [f, setF] = useState(null)
   const [orgs, setOrgs] = useState([])
   const [degreeFromEducation, setDegreeFromEducation] = useState(null)
+  const [educationRows, setEducationRows] = useState([])
+  const [educationNotice, setEducationNotice] = useState([])
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
   const [ctl, setCtl] = useState({ open: false, n: 0 })
@@ -203,8 +205,10 @@ export default function ProfileEdit() {
         fax: pr?.fax || '',
         contact_email: researcher.contact_email || '',
         position: researcher.position || '',
-        academic_title: researcher.academic_title || '',
-        title_year: researcher.title_year || '',
+        academic_title: isAcademicRank(researcher.academic_title) ? researcher.academic_title : '',
+        title_year: isAcademicRank(researcher.academic_title) ? (researcher.title_year || '') : '',
+        professional_title: researcher.professional_title || (PROFESSIONAL_TITLES.includes(researcher.academic_title) ? researcher.academic_title : ''),
+        professional_title_year: researcher.professional_title_year || (PROFESSIONAL_TITLES.includes(researcher.academic_title) ? (researcher.title_year || '') : ''),
         academic_degree: researcher.academic_degree || '',
         degree_year: researcher.degree_year || '',
         degree_country: researcher.degree_country || '',
@@ -227,6 +231,7 @@ export default function ProfileEdit() {
   // Không xóa học vị cũ nếu người dùng chưa khai báo quá trình đào tạo.
   async function syncEducationDegree(items) {
     const best = highestCompletedDegree(items)
+    setEducationRows(items)
     setDegreeFromEducation(best)
     if (!best) return // Giữ hồ sơ cũ nếu chưa có dữ liệu đào tạo.
     const fields = {
@@ -299,9 +304,15 @@ export default function ProfileEdit() {
     if (year != null && !f.academic_title) {
       setMsg('Có năm bổ nhiệm nhưng chưa chọn chức danh/học hàm.'); return
     }
-    if (f.academic_title === 'Giáo sư' && !degreeFromEducation && !f.academic_degree) {
-      setMsg('Hãy khai báo quá trình đào tạo trước khi nhập học hàm.'); return
+    const proYear = f.professional_title_year === '' ? null : Number(f.professional_title_year)
+    if (f.professional_title && (proYear == null || !Number.isInteger(proYear) || proYear < 1900 || proYear > new Date().getFullYear())) {
+      setMsg('Vui lòng nhập năm bổ nhiệm hợp lệ cho chức danh nghề nghiệp.'); return
     }
+    if (proYear != null && !f.professional_title) { setMsg('Có năm bổ nhiệm nhưng chưa chọn chức danh nghề nghiệp.'); return }
+    if (f.academic_title && !isAcademicRank(f.academic_title)) { setMsg('Học hàm chỉ gồm Phó giáo sư hoặc Giáo sư.'); return }
+    const warnings = academicWarnings({ birthDate: f.birth_date, education: educationRows,
+      academicRank: f.academic_title, rankYear: f.title_year, professionalYear: proYear })
+    setEducationNotice(warnings)
     setSaving(true)
     const t = v => (String(v).trim() || null)
     const { error } = await supabase.from('researchers').update({
@@ -309,6 +320,7 @@ export default function ProfileEdit() {
       gender: t(f.gender), birth_year: birthYear, nationality: t(f.nationality),
       position: t(f.position),
       academic_title: t(f.academic_title), title_year: num(f.title_year),
+      professional_title: t(f.professional_title), professional_title_year: num(f.professional_title_year),
       academic_degree: t(degreeFromEducation?.degree || f.academic_degree), degree_year: num(degreeFromEducation?.end_year || f.degree_year), degree_country: t(degreeFromEducation?.country || f.degree_country),
       organization_id: f.organization_id === '' ? null : Number(f.organization_id),
       contact_email: t(f.contact_email), orcid: t(f.orcid),
@@ -534,16 +546,24 @@ export default function ProfileEdit() {
             <label className="wide">Chức vụ (hiện tại hoặc trước khi nghỉ hưu)
               <input value={f.position} onChange={setCap('position')} placeholder="Trưởng bộ môn" />
             </label>
-            <label>Chức danh khoa học / học hàm (theo quyết định bổ nhiệm)
-              <select value={f.academic_title} onChange={set('academic_title')}>
-                <option value="">-- Chọn --</option>
-                {['Trợ giảng', 'Giảng viên', 'Giảng viên chính', 'Giảng viên cao cấp', 'Nghiên cứu viên', 'Nghiên cứu viên chính', 'Nghiên cứu viên cao cấp', 'Phó giáo sư', 'Giáo sư'].map(x => <option key={x}>{x}</option>)}
+            <label>Chức danh nghề nghiệp (theo quyết định bổ nhiệm)
+              <select value={f.professional_title} onChange={set('professional_title')}>
+                <option value="">-- Chưa khai báo --</option>
+                {PROFESSIONAL_TITLES.map(x => <option key={x}>{x}</option>)}
               </select>
             </label>
-            <label>Năm bổ nhiệm
+            <label>Năm bổ nhiệm chức danh nghề nghiệp
+              <input type="number" min="1900" max={new Date().getFullYear()} value={f.professional_title_year} onChange={set('professional_title_year')} />
+            </label>
+            <label>Học hàm (chỉ PGS / GS, theo quyết định công nhận)
+              <select value={f.academic_title} onChange={set('academic_title')}>
+                <option value="">-- Chưa được công nhận / Không có --</option>
+                {ACADEMIC_RANKS.map(x => <option key={x}>{x}</option>)}
+              </select>
+            </label>
+            <label>Năm công nhận học hàm
               <input type="number" min="1900" max={new Date().getFullYear()} value={f.title_year} onChange={set('title_year')} />
             </label>
-            <span />
             <label>Học vị cao nhất (tự động)
               <input readOnly value={degreeFromEducation?.degree || f.academic_degree || 'Chưa khai báo'} />
             </label>
@@ -553,8 +573,13 @@ export default function ProfileEdit() {
             <label>Quốc gia cấp bằng (tự động)
               <input readOnly value={degreeFromEducation?.country || f.degree_country || ''} />
             </label>
-            <p className="hint wide">Học hàm PGS/GS khác chức danh nghề nghiệp giảng viên. Chỉ chọn theo quyết định bổ nhiệm thực tế. Học vị lấy từ mục II – Quá trình đào tạo (chỉ tính văn bằng đã có năm tốt nghiệp). Thực tập sau tiến sĩ không được tính là học vị. Học hàm cần khai báo theo quyết định bổ nhiệm, không suy ra từ bằng cấp.</p>
+            <p className="hint wide">Học hàm: chỉ Phó giáo sư/Giáo sư theo quyết định công nhận. Chức danh nghề nghiệp: giảng viên/nghiên cứu viên theo quyết định bổ nhiệm. Học vị: tự lấy từ quá trình đào tạo; không suy ra học hàm từ học vị. Những mốc thời gian bất thường chỉ được cảnh báo để đối chiếu giấy tờ.</p>
           </div>
+          {academicWarnings({ birthDate: f.birth_date, education: educationRows,
+            academicRank: f.academic_title, rankYear: f.title_year,
+            professionalYear: f.professional_title_year }).map((note, i) => (
+            <p className="hint" key={i} role="status" style={{ color: '#a16207' }}>⚠ {note}</p>
+          ))}
         </Collapse>
 
         <Collapse title="Định danh khoa học và giới thiệu" ctl={ctl}>
