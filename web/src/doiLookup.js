@@ -8,11 +8,9 @@ export function extractDoi(text) {
 
 const plain = s => new DOMParser().parseFromString(String(s || ''), 'text/html').body.textContent.trim()
 
-const first = v => (Array.isArray(v) ? v[0] : v)
-
 const fixCase = s => (s === s.toUpperCase() || s === s.toLowerCase() ? titleCase(s) : s)
 
-// ---------- Crossref ----------
+// ---------- Crossref (bài báo, sách, hội nghị...) ----------
 const CROSSREF_TYPES = {
   'journal-article': 'JOURNAL',
   'proceedings-article': 'CONFERENCE',
@@ -38,7 +36,7 @@ async function fetchCrossref(doi) {
     .map(titleCase)
 
   return {
-    title: plain(m.title?.[0]),
+    title: fixCase(plain(m.title?.[0])),
     abstract: plain(m.abstract),
     publication_type: CROSSREF_TYPES[m.type] || 'OTHER',
     publication_year: date[0] || '',
@@ -89,7 +87,7 @@ async function fetchDataCite(doi) {
   const pageTo = a.container?.lastPage || ''
 
   return {
-    title: plain(a.titles?.[0]?.title),
+    title: fixCase(plain(a.titles?.[0]?.title)),
     abstract: plain(abstractItem?.description),
     publication_type: DATACITE_TYPES[a.types?.resourceTypeGeneral] || 'OTHER',
     publication_year: a.publicationYear || '',
@@ -108,9 +106,13 @@ async function fetchDataCite(doi) {
 
 // ---------- Hàm chính ----------
 export async function fetchByDoi(doi) {
+  // Zenodo (10.5281) và Figshare (10.6084) đăng ký qua DataCite -> gọi DataCite trước
+  const dataciteFirst = /^10\.(5281|6084)\//.test(doi)
+  const sources = dataciteFirst ? [fetchDataCite, fetchCrossref] : [fetchCrossref, fetchDataCite]
+
   let networkError = false
 
-  for (const source of [fetchCrossref, fetchDataCite]) {
+  for (const source of sources) {
     try {
       const result = await source(doi)
       if (result) return result

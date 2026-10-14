@@ -142,7 +142,7 @@ export default function PublicationForm() {
       setSugg(picked)
       setSuggTried(true)
       setAreaIds(prev => [...new Set([...prev, ...picked])])
-      setDoiMsg({ ok: true, text: `Đã điền thông tin từ Crossref (${d.authors.length} tác giả, ${d.citation_count} trích dẫn). ${picked.length ? `Đã gợi ý ${picked.length} lĩnh vực ở mục bên dưới, hãy kiểm tra lại.` : 'Chưa gợi ý được lĩnh vực, hãy tự chọn.'} Nhớ tải file trước khi gửi duyệt.` })
+      setDoiMsg({ ok: true, text: `Đã điền thông tin  (${d.authors.length} tác giả, ${d.citation_count} trích dẫn). ${picked.length ? `Đã gợi ý ${picked.length} lĩnh vực ở mục bên dưới, hãy kiểm tra lại.` : 'Chưa gợi ý được lĩnh vực, hãy tự chọn.'} Nhớ tải file trước khi gửi duyệt.` })
     } catch (e) {
       setDoiMsg({ ok: false, text: e.message })
     }
