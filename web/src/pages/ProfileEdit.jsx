@@ -11,7 +11,19 @@ import ExportCvButton from '../components/ExportCvButton'
 const yearRange = (a, b) => (a ? `${a} – ${b || 'nay'}` : '')
 const num = v => (v === '' || v == null ? null : parseInt(v, 10))
 const cleanPhone = s => String(s || '').replace(/[\s.\-]/g, '')
+const mobilePhoneOk = s => !s || /^0\d{9}$/.test(s)
 const phoneOk = s => !s || /^(0|\+84)\d{9,10}$/.test(s)
+
+// Gợi ý tỉnh/thành phố; người dùng vẫn có thể nhập địa danh khác.
+const vietnamProvinces = [
+  'An Giang', 'Bắc Ninh', 'Cà Mau', 'Cao Bằng', 'Đắk Lắk', 'Điện Biên',
+  'Đồng Nai', 'Đồng Tháp', 'Gia Lai', 'Hà Nội', 'Hà Tĩnh', 'Hải Phòng',
+  'Hưng Yên', 'Khánh Hòa', 'Lai Châu', 'Lâm Đồng', 'Lạng Sơn', 'Lào Cai',
+  'Nghệ An', 'Ninh Bình', 'Phú Thọ', 'Quảng Ngãi', 'Quảng Ninh', 'Quảng Trị',
+  'Sơn La', 'Tây Ninh', 'Thái Nguyên', 'Thanh Hóa', 'Thành phố Đà Nẵng',
+  'Thành phố Hồ Chí Minh', 'Thành phố Huế', 'Tuyên Quang', 'Vĩnh Long',
+  'Thành phố Cần Thơ',
+]
 
 // Mục có thể bung ra / thu lại
 function Collapse({ title, count, defaultOpen = false, ctl, children }) {
@@ -127,6 +139,9 @@ export default function ProfileEdit() {
         full_name: researcher.full_name || '',
         gender: researcher.gender || '',
         birth_date: pr?.birth_date || '',
+        citizen_id: pr?.citizen_id || '',
+        citizen_id_issue_date: pr?.citizen_id_issue_date || '',
+        citizen_id_issued_by: pr?.citizen_id_issued_by || '',
         birth_place: pr?.birth_place || '',
         hometown: pr?.hometown || '',
         ethnicity: pr?.ethnicity || '',
@@ -178,9 +193,34 @@ export default function ProfileEdit() {
       }
       birthYear = d.getFullYear()
     }
-    const phone = cleanPhone(f.phone), phoneO = cleanPhone(f.phone_office), phoneH = cleanPhone(f.phone_home)
-    if (!phoneOk(phone) || !phoneOk(phoneO) || !phoneOk(phoneH)) {
-      setMsg('Số điện thoại không hợp lệ (ví dụ 0912345678).'); return
+    const phone = cleanPhone(f.phone)
+    const phoneO = cleanPhone(f.phone_office)
+    const phoneH = cleanPhone(f.phone_home)
+
+    if (!mobilePhoneOk(phone)) {
+      setMsg('Số điện thoại di động phải gồm đúng 10 chữ số và bắt đầu bằng 0.')
+      return
+    }
+
+    if (!phoneOk(phoneO) || !phoneOk(phoneH)) {
+      setMsg('Số điện thoại cơ quan hoặc nhà riêng không hợp lệ.')
+      return
+    }
+
+    const citizenId = String(f.citizen_id || '').replace(/\D/g, '')
+    if (citizenId && !/^\d{12}$/.test(citizenId)) {
+      setMsg('Số CCCD phải gồm đúng 12 chữ số.')
+      return
+    }
+
+    if (f.citizen_id_issue_date) {
+      const issueDate = new Date(`${f.citizen_id_issue_date}T00:00:00`)
+      const todayDate = new Date()
+      todayDate.setHours(23, 59, 59, 999)
+      if (isNaN(issueDate.getTime()) || issueDate > todayDate) {
+        setMsg('Ngày cấp CCCD không hợp lệ.')
+        return
+      }
     }
 
     setSaving(true)
@@ -201,6 +241,9 @@ export default function ProfileEdit() {
 
     const priv = await supabase.from('researcher_private').upsert({
       researcher_id: researcher.id,
+      citizen_id: citizenId || null,
+      citizen_id_issue_date: f.citizen_id_issue_date || null,
+      citizen_id_issued_by: t(f.citizen_id_issued_by),
       birth_date: f.birth_date || null, birth_place: t(f.birth_place),
       hometown: t(f.hometown), ethnicity: t(f.ethnicity), address: t(f.address),
       phone: phone || null, phone_office: phoneO || null, phone_home: phoneH || null, fax: t(f.fax),
@@ -246,14 +289,72 @@ export default function ProfileEdit() {
             <label><span className="lock"><Lock size={12} /> Ngày sinh</span>
               <input type="date" value={f.birth_date} max={today} onChange={set('birth_date')} />
             </label>
-            <label><span className="lock"><Lock size={12} /> Nơi sinh</span>
-              <input value={f.birth_place} onChange={setCap('birth_place')} placeholder="TP. Hồ Chí Minh" />
+            <label>
+              <span className="lock"><Lock size={12} /> Số CCCD</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={12}
+                value={f.citizen_id || ''}
+                placeholder="Nhập 12 chữ số"
+                aria-invalid={Boolean(f.citizen_id && !/^\d{12}$/.test(f.citizen_id))}
+                onChange={e => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 12)
+                  setF(prev => ({ ...prev, citizen_id: digits }))
+                }}
+              />
+              {f.citizen_id && !/^\d{12}$/.test(f.citizen_id) && (
+                <small style={{ color: '#dc2626' }}>CCCD phải có đúng 12 chữ số.</small>
+              )}
             </label>
-            <label><span className="lock"><Lock size={12} /> Quê quán</span>
-              <input value={f.hometown} onChange={setCap('hometown')} />
+            <label>
+              <span className="lock"><Lock size={12} /> Ngày cấp CCCD</span>
+              <input
+                type="date"
+                max={today}
+                value={f.citizen_id_issue_date || ''}
+                onChange={e => setF(prev => ({ ...prev, citizen_id_issue_date: e.target.value }))}
+              />
             </label>
+            <label>
+              <span className="lock"><Lock size={12} /> Cơ quan cấp CCCD</span>
+              <input
+                value={f.citizen_id_issued_by || ''}
+                onChange={e => setF(prev => ({ ...prev, citizen_id_issued_by: e.target.value }))}
+                placeholder="Cơ quan cấp"
+              />
+            </label>
+            <label>
+              <span className="lock"><Lock size={12} /> Nơi sinh</span>
+              <input
+                list="vietnam-provinces"
+                value={f.birth_place}
+                onChange={setCap('birth_place')}
+                placeholder="Nhập tỉnh/thành phố"
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              <span className="lock"><Lock size={12} /> Quê quán</span>
+              <input
+                list="vietnam-provinces"
+                value={f.hometown}
+                onChange={setCap('hometown')}
+                placeholder="Nhập tỉnh/thành phố"
+                autoComplete="off"
+              />
+            </label>
+            <datalist id="vietnam-provinces">
+              {vietnamProvinces.map(province => (
+                <option key={province} value={province} />
+              ))}
+            </datalist>
             <label><span className="lock"><Lock size={12} /> Dân tộc</span>
-              <input value={f.ethnicity} onChange={setCap('ethnicity')} placeholder="Kinh" />
+              <select value={f.ethnicity} onChange={set('ethnicity')}>
+                <option value="">-- Chọn dân tộc --</option>
+                {['Kinh','Tày','Thái','Mường','Khmer','Hoa','Nùng','Mông','Dao','Gia Rai','Ê Đê','Ba Na','Sán Chay','Chăm','Cơ Ho','Xơ Đăng','Sán Dìu','Hrê','Ra Glai','Mnông','Thổ','Stiêng','Khơ Mú','Bru-Vân Kiều','Giáy','Cơ Tu','Gié-Triêng','Mạ','Kháng','Co','Tà Ôi','Chơ Ro','Xinh Mun','Hà Nhì','Chu Ru','Lào','La Chí','La Ha','Phù Lá','La Hủ','Lự','Lô Lô','Chứt','Mảng','Pà Thẻn','Cờ Lao','Bố Y','Cống','Si La','Pu Péo','Rơ Măm','Brâu','Ơ Đu'].map(x => <option key={x}>{x}</option>)}
+              </select>
             </label>
             <label>Quốc tịch
               <input value={f.nationality} onChange={setCap('nationality')} />
@@ -262,13 +363,29 @@ export default function ProfileEdit() {
               <input value={f.address} onChange={setCap('address')} />
             </label>
             <label><span className="lock"><Lock size={12} /> Điện thoại cơ quan (CQ)</span>
-              <input type="tel" value={f.phone_office} onChange={set('phone_office')} />
+              <input type="tel" value={f.phone_office} onChange={set('phone_office')} placeholder="Ví dụ: 02812345678" />
             </label>
             <label><span className="lock"><Lock size={12} /> Điện thoại nhà riêng (NR)</span>
-              <input type="tel" value={f.phone_home} onChange={set('phone_home')} />
+              <input type="tel" value={f.phone_home} onChange={set('phone_home')} placeholder="Ví dụ: 02812345678" />
             </label>
-            <label><span className="lock"><Lock size={12} /> Điện thoại di động (DĐ)</span>
-              <input type="tel" value={f.phone} onChange={set('phone')} placeholder="0912 345 678" />
+            <label>
+              <span className="lock"><Lock size={12} /> Điện thoại di động (DĐ)</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                maxLength={10}
+                value={f.phone}
+                placeholder="0912345678"
+                aria-invalid={Boolean(f.phone && !mobilePhoneOk(cleanPhone(f.phone)))}
+                onChange={e => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 10)
+                  setF(prev => ({ ...prev, phone: digits }))
+                }}
+              />
+              {f.phone && !mobilePhoneOk(cleanPhone(f.phone)) && (
+                <small style={{ color: '#dc2626' }}>Nhập đủ 10 chữ số, bắt đầu bằng số 0.</small>
+              )}
             </label>
             <label><span className="lock"><Lock size={12} /> Fax</span>
               <input value={f.fax} onChange={set('fax')} />
