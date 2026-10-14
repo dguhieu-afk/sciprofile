@@ -46,6 +46,7 @@ export default function PublicationForm() {
   const [doiBusy, setDoiBusy] = useState(false)
   const [doiMsg, setDoiMsg] = useState(null) // { ok, text }
   const [dupDoi, setDupDoi] = useState([])
+  const [verifiedDoi, setVerifiedDoi] = useState('')
 
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
 
@@ -115,6 +116,7 @@ export default function PublicationForm() {
     setDoiBusy(true)
     try {
       const d = await fetchByDoi(doi)
+      if (!d?.doi || !d?.title) throw new Error('Không xác minh được DOI.')
 
       // Kiểm tra DOI đã có trong hệ thống chưa
       const { data: dup } = await supabase.from('publications').select('id,title,status').ilike('doi', doi)
@@ -142,6 +144,7 @@ export default function PublicationForm() {
       setSugg(picked)
       setSuggTried(true)
       setAreaIds(prev => [...new Set([...prev, ...picked])])
+      setVerifiedDoi(d.doi.trim().toLowerCase())
       setDoiMsg({ ok: true, text: `Đã điền thông tin  (${d.authors.length} tác giả, ${d.citation_count} trích dẫn). ${picked.length ? `Đã gợi ý ${picked.length} lĩnh vực ở mục bên dưới, hãy kiểm tra lại.` : 'Chưa gợi ý được lĩnh vực, hãy tự chọn.'} Nhớ tải file trước khi gửi duyệt.` })
     } catch (e) {
       setDoiMsg({ ok: false, text: e.message })
@@ -174,13 +177,18 @@ export default function PublicationForm() {
     setAuthors(copy)
   }
 
-  async function save(status) {
+  async function save(requestedStatus) {
     setErr('')
+    // Chỉ công khai ngay khi DOI đã được tra cứu thành công ở phiên này.
+    // Bài đang chỉnh sửa vẫn gửi duyệt lại để tránh sửa nội dung đã xác minh.
+    const isVerifiedDoi = !editing && verifiedDoi &&
+      extractDoi(f.doi)?.toLowerCase() === verifiedDoi
+    const status = requestedStatus === 'PENDING' && isVerifiedDoi ? 'APPROVED' : requestedStatus
     if (f.title.trim().length < 5) { setErr('Vui lòng nhập tiêu đề (ít nhất 5 ký tự).'); return }
     if (authors.length === 0) { setErr('Cần có ít nhất một tác giả.'); return }
     const year = parseInt(f.publication_year, 10)
     if (!year || year < 1950 || year > new Date().getFullYear() + 1) { setErr('Năm công bố không hợp lệ.'); return }
-    if (status === 'PENDING') {
+    if (status === 'PENDING' || status === 'APPROVED') {
       if (areaIds.length === 0) { setErr('Hãy chọn ít nhất một lĩnh vực trước khi gửi duyệt.'); return }
     }
     setBusy(true)
@@ -402,13 +410,13 @@ export default function PublicationForm() {
         </div>
 
         {err && <div className="auth-error" style={{ marginTop: 16 }}>{err}</div>}
-        <p className="hint" style={{ marginTop: 14 }}>Sau khi gửi kiểm duyệt: Chúng tôi sẽ cập nhật dữ liệu cho bạn trong khoảng 1-2 ngày.</p>
+        <p className="hint" style={{ marginTop: 14 }}>Bài nhập mới có DOI được tra cứu thành công sẽ công khai ngay (nếu quyền Supabase cho phép). Bài nhập thủ công hoặc bài chỉnh sửa sẽ gửi kiểm duyệt.</p>
         <div className="form-actions">
           {!(editing && f.status === 'APPROVED') && (
             <button className="btn btn-ghost" disabled={busy} onClick={() => save('DRAFT')}>Lưu nháp</button>
           )}
           <button className="btn btn-primary" disabled={busy} onClick={() => save('PENDING')}>
-            {busy ? 'Đang lưu...' : 'Gửi kiểm duyệt'}
+            {busy ? 'Đang lưu...' : (!editing && verifiedDoi && extractDoi(f.doi)?.toLowerCase() === verifiedDoi ? 'Công khai công trình' : 'Gửi kiểm duyệt')}
           </button>
         </div>
       </div>
