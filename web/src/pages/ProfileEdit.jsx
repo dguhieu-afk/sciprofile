@@ -8,6 +8,14 @@ import { useAuth } from '../AuthContext'
 import { liveCap, titleCase, capFirst } from '../utils'
 import ExportCvButton from '../components/ExportCvButton'
 
+// Học vị dựa trên văn bằng đã cấp, không suy ra học hàm/chức danh bổ nhiệm.
+const degreeRank = { 'Cử nhân': 1, 'Kỹ sư': 1, 'Thạc sĩ': 2, 'Tiến sĩ': 3, 'Tiến sĩ khoa học': 4 }
+function highestCompletedDegree(items) {
+  const now = new Date().getFullYear()
+  return items.filter(i => degreeRank[i.degree] && Number(i.end_year) >= 1900 && Number(i.end_year) <= now)
+    .sort((a, b) => (degreeRank[b.degree] - degreeRank[a.degree]) || (Number(b.end_year) - Number(a.end_year)))[0] || null
+}
+
 const yearRange = (a, b) => (a ? `${a} – ${b || 'nay'}` : '')
 const num = v => (v === '' || v == null ? null : parseInt(v, 10))
 const cleanPhone = s => String(s || '').replace(/[\s.\-]/g, '')
@@ -41,7 +49,7 @@ function Collapse({ title, count, defaultOpen = false, ctl, children }) {
   )
 }
 
-function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ctl }) {
+function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ctl, onItemsChanged }) {
   const blank = Object.fromEntries(fields.map(f => [f.key, '']))
   const [items, setItems] = useState([])
   const [draft, setDraft] = useState(blank)
@@ -49,9 +57,11 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ct
   const { confirm } = useUI()
 
   async function load() {
-    const { data } = await supabase.from(table).select('*')
+    const { data, error } = await supabase.from(table).select('*')
       .eq('researcher_id', rid).order(orderBy, { ascending: !!asc })
+    if (error) { setErr(error.message); return }
     setItems(data || [])
+    if (onItemsChanged) onItemsChanged(data || [])
   }
   useEffect(() => { load() }, [rid]) // eslint-disable-line
 
@@ -71,7 +81,8 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ct
 
   async function remove(id) {
            if (!(await confirm({ title: 'Xóa mục này?', message: 'Thao tác này không thể hoàn tác.', confirmText: 'Xóa', danger: true }))) return
-    await supabase.from(table).delete().eq('id', id)
+    const { error } = await supabase.from(table).delete().eq('id', id)
+    if (error) { setErr(error.message); return }
     load()
   }
 
@@ -126,6 +137,7 @@ export default function ProfileEdit() {
   const navigate = useNavigate()
   const [f, setF] = useState(null)
   const [orgs, setOrgs] = useState([])
+  const [degreeFromEducation, setDegreeFromEducation] = useState(null)
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
   const [ctl, setCtl] = useState({ open: false, n: 0 })
@@ -213,6 +225,23 @@ export default function ProfileEdit() {
     supabase.from('organizations').select('id,name').order('id').then(({ data }) => setOrgs(data || []))
   }, [])
 
+  // Đồng bộ học vị từ những dòng đào tạo có năm cấp bằng hợp lệ.
+  // Không xóa học vị cũ nếu người dùng chưa khai báo quá trình đào tạo.
+  async function syncEducationDegree(items) {
+    const best = highestCompletedDegree(items)
+    setDegreeFromEducation(best)
+    if (!best) return
+    const fields = {
+      academic_degree: best.degree,
+      degree_year: Number(best.end_year),
+      degree_country: best.country || null,
+    }
+    const { error } = await supabase.from('researchers').update(fields).eq('id', researcher.id)
+    if (error) { setMsg('Không đồng bộ được học vị: ' + error.message); return }
+    setF(prev => prev ? { ...prev, academic_degree: best.degree,
+      degree_year: String(best.end_year), degree_country: best.country || '' } : prev)
+  }
+
   if (!f || !researcher) return <main className="container page"><div className="empty">Đang tải...</div></main>
 
   const set = k => e => setF({ ...f, [k]: e.target.value })
@@ -272,7 +301,7 @@ export default function ProfileEdit() {
       gender: t(f.gender), birth_year: birthYear, nationality: t(f.nationality),
       position: t(f.position),
       academic_title: t(f.academic_title), title_year: num(f.title_year),
-      academic_degree: t(f.academic_degree), degree_year: num(f.degree_year), degree_country: t(f.degree_country),
+      academic_degree: t(degreeFromEducation?.degree || f.academic_degree), degree_year: num(degreeFromEducation?.end_year || f.degree_year), degree_country: t(degreeFromEducation?.country || f.degree_country),
       organization_id: f.organization_id === '' ? null : Number(f.organization_id),
       contact_email: t(f.contact_email), orcid: t(f.orcid),
       google_scholar_url: t(f.google_scholar_url), website: t(f.website),
@@ -472,28 +501,26 @@ export default function ProfileEdit() {
             <label className="wide">Chức vụ (hiện tại hoặc trước khi nghỉ hưu)
               <input value={f.position} onChange={setCap('position')} placeholder="Trưởng bộ môn" />
             </label>
-            <label>Chức danh khoa học cao nhất
+            <label>Chức danh khoa học / học hàm (theo quyết định bổ nhiệm)
               <select value={f.academic_title} onChange={set('academic_title')}>
                 <option value="">-- Chọn --</option>
-                {['Trợ giảng', 'Giảng viên', 'Giảng viên chính', 'Nghiên cứu viên', 'Phó giáo sư', 'Giáo sư'].map(x => <option key={x}>{x}</option>)}
+                {['Trợ giảng', 'Giảng viên', 'Giảng viên chính', 'Giảng viên cao cấp', 'Nghiên cứu viên', 'Nghiên cứu viên chính', 'Nghiên cứu viên cao cấp', 'Phó giáo sư', 'Giáo sư'].map(x => <option key={x}>{x}</option>)}
               </select>
             </label>
             <label>Năm bổ nhiệm
-              <input type="number" value={f.title_year} onChange={set('title_year')} />
+              <input type="number" min="1900" max={new Date().getFullYear()} value={f.title_year} onChange={set('title_year')} />
             </label>
             <span />
-            <label>Học vị cao nhất
-              <select value={f.academic_degree} onChange={set('academic_degree')}>
-                <option value="">-- Chọn --</option>
-                {['Cử nhân', 'Kỹ sư', 'Thạc sĩ', 'Tiến sĩ', 'Tiến sĩ khoa học'].map(x => <option key={x}>{x}</option>)}
-              </select>
+            <label>Học vị cao nhất (tự động)
+              <input readOnly value={degreeFromEducation?.degree || f.academic_degree || 'Chưa khai báo'} />
             </label>
-            <label>Năm nhận học vị
-              <input type="number" value={f.degree_year} onChange={set('degree_year')} />
+            <label>Năm cấp bằng (tự động)
+              <input readOnly value={degreeFromEducation?.end_year || f.degree_year || ''} />
             </label>
-            <label>Nước nhận học vị
-              <input value={f.degree_country} onChange={setCap('degree_country')} placeholder="Việt Nam" />
+            <label>Quốc gia cấp bằng (tự động)
+              <input readOnly value={degreeFromEducation?.country || f.degree_country || ''} />
             </label>
+            <p className="hint wide">Học vị lấy từ mục II – Quá trình đào tạo (chỉ tính văn bằng đã có năm tốt nghiệp). Thực tập sau tiến sĩ không được tính là học vị. Học hàm cần khai báo theo quyết định bổ nhiệm, không suy ra từ bằng cấp.</p>
           </div>
         </Collapse>
 
@@ -543,11 +570,12 @@ export default function ProfileEdit() {
       </form>
 
       <ItemSection ctl={ctl}
+        onItemsChanged={syncEducationDegree}
         title="II. Quá trình đào tạo"
         hint="Đại học: chọn Cử nhân/Kỹ sư (nhập bằng thứ hai nếu có). Sau đại học: chọn Thạc sĩ, Tiến sĩ và nhập tên luận văn/luận án."
         table="researcher_education" rid={researcher.id} orderBy="end_year"
         fields={[
-          { key: 'degree', label: 'Bậc đào tạo *', type: 'select', options: ['Cử nhân', 'Kỹ sư', 'Thạc sĩ', 'Tiến sĩ', 'Thực tập sau tiến sĩ', 'Khác'] },
+          { key: 'degree', label: 'Bậc đào tạo *', type: 'select', options: ['Cử nhân', 'Kỹ sư', 'Thạc sĩ', 'Tiến sĩ', 'Tiến sĩ khoa học', 'Thực tập sau tiến sĩ', 'Khác'] },
           { key: 'training_system', label: 'Hệ đào tạo', type: 'select', options: ['Chính quy', 'Vừa làm vừa học', 'Từ xa', 'Liên thông', 'Khác'] },
           { key: 'major', label: 'Ngành / chuyên ngành', placeholder: 'Khoa học máy tính' },
           { key: 'institution', label: 'Nơi đào tạo', placeholder: 'Đại học Bách khoa', wide: true },
