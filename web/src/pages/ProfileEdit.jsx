@@ -7,14 +7,8 @@ import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import { liveCap, titleCase, capFirst } from '../utils'
 import ExportCvButton from '../components/ExportCvButton'
-
-// Học vị dựa trên văn bằng đã cấp, không suy ra học hàm/chức danh bổ nhiệm.
-const degreeRank = { 'Cử nhân': 1, 'Kỹ sư': 1, 'Thạc sĩ': 2, 'Tiến sĩ': 3, 'Tiến sĩ khoa học': 4 }
-function highestCompletedDegree(items) {
-  const now = new Date().getFullYear()
-  return items.filter(i => degreeRank[i.degree] && Number(i.end_year) >= 1900 && Number(i.end_year) <= now)
-    .sort((a, b) => (degreeRank[b.degree] - degreeRank[a.degree]) || (Number(b.end_year) - Number(a.end_year)))[0] || null
-}
+import { highestCompletedDegree, sortEducation, validateEducation } from '../academicLogic'
+import './ProfileEditProfessional.css'
 
 const yearRange = (a, b) => (a ? `${a} – ${b || 'nay'}` : '')
 const num = v => (v === '' || v == null ? null : parseInt(v, 10))
@@ -38,7 +32,7 @@ function Collapse({ title, count, defaultOpen = false, ctl, children }) {
   const [open, setOpen] = useState(defaultOpen)
   useEffect(() => { if (ctl && ctl.n > 0) setOpen(ctl.open) }, [ctl])
   return (
-    <section className={`form-card acc ${open ? 'open' : ''}`}>
+    <section className={`form-card acc profile-section ${open ? 'open' : ''}`}>
       <button type="button" className="acc-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         <span className="acc-title">{title}</span>
         {count != null && <em className="acc-count">{count}</em>}
@@ -49,7 +43,7 @@ function Collapse({ title, count, defaultOpen = false, ctl, children }) {
   )
 }
 
-function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ctl, onItemsChanged }) {
+function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ctl, onItemsChanged, validateCandidate, sortItems }) {
   const blank = Object.fromEntries(fields.map(f => [f.key, '']))
   const [items, setItems] = useState([])
   const [draft, setDraft] = useState(blank)
@@ -60,7 +54,7 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ct
     const { data, error } = await supabase.from(table).select('*')
       .eq('researcher_id', rid).order(orderBy, { ascending: !!asc })
     if (error) { setErr(error.message); return }
-    setItems(data || [])
+    setItems(sortItems ? sortItems(data || []) : (data || []))
     if (onItemsChanged) onItemsChanged(data || [])
   }
   useEffect(() => { load() }, [rid]) // eslint-disable-line
@@ -74,6 +68,10 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ct
       const v = draft[f.key]
       row[f.key] = f.type === 'number' ? num(v) : (String(v).trim() || null)
     })
+    if (validateCandidate) {
+      const validation = validateCandidate([...items, row])
+      if (validation) { setErr(validation); return }
+    }
     const { error } = await supabase.from(table).insert(row)
     if (error) { setErr(error.message); return }
     setErr(''); setDraft(blank); load()
@@ -230,7 +228,7 @@ export default function ProfileEdit() {
   async function syncEducationDegree(items) {
     const best = highestCompletedDegree(items)
     setDegreeFromEducation(best)
-    if (!best) return
+    if (!best) return // Giữ hồ sơ cũ nếu chưa có dữ liệu đào tạo.
     const fields = {
       academic_degree: best.degree,
       degree_year: Number(best.end_year),
@@ -294,6 +292,16 @@ export default function ProfileEdit() {
       }
     }
 
+    const year = f.title_year === '' ? null : Number(f.title_year)
+    if (f.academic_title && (year == null || !Number.isInteger(year) || year < 1900 || year > new Date().getFullYear())) {
+      setMsg('Vui lòng nhập năm bổ nhiệm hợp lệ cho chức danh/học hàm đã chọn.'); return
+    }
+    if (year != null && !f.academic_title) {
+      setMsg('Có năm bổ nhiệm nhưng chưa chọn chức danh/học hàm.'); return
+    }
+    if (f.academic_title === 'Giáo sư' && !degreeFromEducation && !f.academic_degree) {
+      setMsg('Hãy khai báo quá trình đào tạo trước khi nhập học hàm.'); return
+    }
     setSaving(true)
     const t = v => (String(v).trim() || null)
     const { error } = await supabase.from('researchers').update({
@@ -329,11 +337,12 @@ export default function ProfileEdit() {
   }
 
   return (
-    <main className="container page">
-      <div className="page-head row-between">
+    <main className="container page professional-profile">
+      <div className="page-head row-between profile-hero">
         <div>
-          <h1>Hồ sơ khoa học của tôi</h1>
-          <p>Điền đầy đủ để xuất lý lịch khoa học (Phụ lục III). Mục có biểu tượng khóa chỉ bạn và quản trị viên xem được.</p>
+          <div className="profile-eyebrow">QUẢN LÝ THÔNG TIN CÁ NHÂN</div>
+          <h1>Hồ sơ khoa học</h1>
+          <p>Cập nhật thông tin chính xác để hiển thị hồ sơ và xuất CV khoa học. Các trường có biểu tượng khóa được bảo vệ theo phân quyền.</p>
         </div>
         <div className="actions">
           <ExportCvButton researcherId={researcher.id} />
@@ -341,27 +350,35 @@ export default function ProfileEdit() {
         </div>
       </div>
 
+      <div className="profile-overview" aria-label="Hướng dẫn hoàn thiện hồ sơ">
+        <div className="profile-overview-item"><span className="profile-step-num">01</span><div><strong>Thông tin cơ bản</strong><small>Cá nhân, định danh và liên hệ</small></div></div>
+        <div className="profile-overview-item"><span className="profile-step-num">02</span><div><strong>Học thuật</strong><small>Học hàm, học vị và đào tạo</small></div></div>
+        <div className="profile-overview-item"><span className="profile-step-num">03</span><div><strong>CV khoa học</strong><small>Công tác, đề tài và giải thưởng</small></div></div>
+      </div>
+
       <div className="acc-tools">
         <button type="button" className="link-btn" onClick={() => setCtl(c => ({ open: true, n: c.n + 1 }))}>Mở tất cả</button>
         <button type="button" className="link-btn" onClick={() => setCtl(c => ({ open: false, n: c.n + 1 }))}>Thu gọn tất cả</button>
       </div>
 
-      <form onSubmit={save}>
+      <form onSubmit={save} className="profile-main-form">
         <Collapse title="I. Lý lịch sơ lược" defaultOpen ctl={ctl}>
                     <AvatarUpload researcher={researcher} userId={user.id} onDone={reload} />
-          <div className="form-grid">
-            <label className="wide">Họ và tên *
+          <div className="form-grid profile-fields">
+            <div className="profile-form-group-title"><span>01</span><div><strong>Thông tin cá nhân</strong><small>Họ tên, giới tính và ngày sinh</small></div></div>
+            <label className="wide profile-name">Họ và tên *
               <input value={f.full_name} onChange={e => setF({ ...f, full_name: liveCap(e.target.value) })} placeholder="Nguyễn Văn A" />
             </label>
-            <label style={{ maxWidth: 240 }}>Giới tính
+            <label className="profile-compact">Giới tính
               <select value={f.gender} onChange={set('gender')}>
                 <option value="">-- Chọn --</option>
                 <option>Nam</option><option>Nữ</option><option>Khác</option>
               </select>
             </label>
-            <label style={{ maxWidth: 240 }}><span className="lock"><Lock size={12} /> Ngày sinh</span>
+            <label className="profile-compact"><span className="lock"><Lock size={12} /> Ngày sinh</span>
               <input type="date" value={f.birth_date} max={today} onChange={set('birth_date')} />
             </label>
+            <div className="profile-form-group-title"><span>02</span><div><strong>Giấy tờ định danh</strong><small>Thông tin chỉ hiển thị theo quyền truy cập</small></div></div>
             <label>
               <span className="lock"><Lock size={12} /> Số CCCD</span>
               <input
@@ -398,6 +415,7 @@ export default function ProfileEdit() {
                 placeholder="Cục Cảnh sát quản lý hành chính về trật tự xã hội."
               />
             </label>
+            <div className="profile-form-group-title"><span>03</span><div><strong>Quê quán và liên hệ</strong><small>Địa chỉ, số điện thoại và email</small></div></div>
             <label>
               <span className="lock"><Lock size={12} /> Nơi sinh</span>
               <input
@@ -491,7 +509,8 @@ export default function ProfileEdit() {
         </Collapse>
 
         <Collapse title="Đơn vị, chức vụ, học hàm, học vị" ctl={ctl}>
-          <div className="form-grid">
+          <p className="profile-section-intro">Thông tin chuyên môn phục vụ giới thiệu nhà khoa học và CV. Học vị cao nhất đồng bộ từ quá trình đào tạo đã khai báo.</p>
+          <div className="form-grid profile-fields">
             <label>Đơn vị công tác
               <select value={f.organization_id} onChange={set('organization_id')}>
                 <option value="">-- Chọn --</option>
@@ -520,12 +539,13 @@ export default function ProfileEdit() {
             <label>Quốc gia cấp bằng (tự động)
               <input readOnly value={degreeFromEducation?.country || f.degree_country || ''} />
             </label>
-            <p className="hint wide">Học vị lấy từ mục II – Quá trình đào tạo (chỉ tính văn bằng đã có năm tốt nghiệp). Thực tập sau tiến sĩ không được tính là học vị. Học hàm cần khai báo theo quyết định bổ nhiệm, không suy ra từ bằng cấp.</p>
+            <p className="hint wide">Học hàm PGS/GS khác chức danh nghề nghiệp giảng viên. Chỉ chọn theo quyết định bổ nhiệm thực tế. Học vị lấy từ mục II – Quá trình đào tạo (chỉ tính văn bằng đã có năm tốt nghiệp). Thực tập sau tiến sĩ không được tính là học vị. Học hàm cần khai báo theo quyết định bổ nhiệm, không suy ra từ bằng cấp.</p>
           </div>
         </Collapse>
 
         <Collapse title="Định danh khoa học và giới thiệu" ctl={ctl}>
-          <div className="form-grid">
+          <p className="profile-section-intro">Các đường dẫn học thuật giúp người xem tìm được công bố và thông tin nghiên cứu của bạn.</p>
+          <div className="form-grid profile-fields">
             <label>ORCID
               <input value={f.orcid} onChange={set('orcid')} placeholder="0000-0000-0000-0000" />
             </label>
@@ -563,7 +583,7 @@ export default function ProfileEdit() {
         </Collapse>
 
         {msg && <div className={msg.startsWith('Đã') ? 'ok-msg' : 'auth-error'} style={{ marginTop: 16 }}>{msg}</div>}
-        <div className="save-bar">
+        <div className="save-bar profile-save-bar">
           <button className="btn btn-primary" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu thông tin'}</button>
           <span className="hint">Nhấn lưu để cập nhật các mục phía trên (I, đơn vị, định danh).</span>
         </div>
@@ -571,8 +591,9 @@ export default function ProfileEdit() {
 
       <ItemSection ctl={ctl}
         onItemsChanged={syncEducationDegree}
+        validateCandidate={validateEducation} sortItems={sortEducation}
         title="II. Quá trình đào tạo"
-        hint="Đại học: chọn Cử nhân/Kỹ sư (nhập bằng thứ hai nếu có). Sau đại học: chọn Thạc sĩ, Tiến sĩ và nhập tên luận văn/luận án."
+        hint="Nhập theo quá trình thực tế. Năm bắt đầu không sau năm kết thúc; bậc cao hơn không được có năm cấp bằng sớm hơn bậc thấp hơn. Thực tập sau tiến sĩ không phải học vị. Danh sách và CV sẽ xếp từ cũ đến mới."
         table="researcher_education" rid={researcher.id} orderBy="end_year"
         fields={[
           { key: 'degree', label: 'Bậc đào tạo *', type: 'select', options: ['Cử nhân', 'Kỹ sư', 'Thạc sĩ', 'Tiến sĩ', 'Tiến sĩ khoa học', 'Thực tập sau tiến sĩ', 'Khác'] },
