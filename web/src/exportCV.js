@@ -1,6 +1,7 @@
 import { Packer } from 'docx'
 import { supabase } from './supabase'
 import { buildCvDoc } from './cvDoc'
+import { sortEducation } from './academicLogic'
 
 const ascii = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^a-zA-Z0-9]+/g, '_')
@@ -16,7 +17,7 @@ export async function downloadCV(id) {
     supabase.from('publication_authors').select('publications(title,publication_year,journal,status)').eq('researcher_id', id),
     supabase.from('organizations').select('id,name,parent_id'),
   ])
-  if (r.error) throw r.error
+  for (const result of [r, pr, edu, exp, lg, pj, pa, og]) if (result.error) throw result.error
 
   const map = new Map((og.data || []).map(o => [o.id, o]))
   const names = []
@@ -30,7 +31,7 @@ export async function downloadCV(id) {
   const doc = buildCvDoc({
     r: r.data, p: pr.data || {},
     orgChain: names.join(', '), rootOrg: names[names.length - 1] || '',
-    edu: edu.data || [], exp: exp.data || [], langs: lg.data || [],
+    edu: sortEducation(edu.data || []), exp: exp.data || [], langs: lg.data || [],
     projects: pj.data || [], pubs,
   })
 

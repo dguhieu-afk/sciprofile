@@ -1,3 +1,4 @@
+import { highestCompletedDegree, sortEducation } from './academicLogic'
 import {
   Document, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType,
   WidthType, BorderStyle, LevelFormat, Header, PageNumber,
@@ -86,15 +87,17 @@ export function buildCvDoc(d) {
   const now = new Date()
   const dateLine = `.........., ngày ${String(now.getDate()).padStart(2, '0')} tháng ${String(now.getMonth() + 1).padStart(2, '0')} năm ${now.getFullYear()}`
 
+  const orderedEducation = sortEducation(edu)
+  const highest = highestCompletedDegree(orderedEducation)
   const byEnd = (a, b) => (a.end_year || 9999) - (b.end_year || 9999)
   const uni = edu.filter(e => ['Cử nhân', 'Kỹ sư'].includes(e.degree)).sort(byEnd)
   const u1 = uni[0] || {}
   const u2 = uni[1]
-  const ths = edu.find(e => e.degree === 'Thạc sĩ') || {}
-  const ts = edu.find(e => e.degree === 'Tiến sĩ') || {}
+  const ths = orderedEducation.filter(e => e.degree === 'Thạc sĩ').sort(byEnd).at(-1) || {}
+  const ts = orderedEducation.filter(e => e.degree === 'Tiến sĩ').sort(byEnd).at(-1) || {}
 
   const phones = `CQ: ${p.phone_office || ''}      NR: ${p.phone_home || ''}      DĐ: ${p.phone || ''}`
-  const degreeYear = [r.degree_year, r.degree_country].filter(Boolean).join(', ')
+  const degreeYear = [highest?.end_year || r.degree_year, highest?.country || r.degree_country].filter(Boolean).join(', ')
 
   const children = [
     para([t('BỘ GIÁO DỤC VÀ ĐÀO TẠO', { bold: true })]),
@@ -124,7 +127,7 @@ export function buildCvDoc(d) {
       [['Họ và tên', r.full_name], ['Giới tính', r.gender]],
       [['Ngày, tháng, năm sinh', fmtDate(p.birth_date)], ['Nơi sinh', p.birth_place]],
       [['Quê quán', p.hometown], ['Dân tộc', p.ethnicity]],
-      [['Học vị cao nhất', r.academic_degree], ['Năm, nước nhận học vị', degreeYear]],
+      [['Học vị cao nhất', highest?.degree || r.academic_degree], ['Năm, nước nhận học vị', degreeYear]],
       [['Chức danh khoa học cao nhất', r.academic_title], ['Năm bổ nhiệm', r.title_year]],
       [['Chức vụ (hiện tại hoặc trước khi nghỉ hưu)', r.position]],
       [['Đơn vị công tác (hiện tại hoặc trước khi nghỉ hưu)', orgChain]],
@@ -135,6 +138,12 @@ export function buildCvDoc(d) {
 
     para([t('')], { spacing: { after: 60 } }),
     bold('II. QUÁ TRÌNH ĐÀO TẠO'),
+    para('Toàn bộ văn bằng và giai đoạn đào tạo (sắp xếp theo thời gian cấp bằng/kết thúc từ cũ đến mới):'),
+    grid([650, 1800, 1450, 1548, 2350, 1500],
+      ['TT', 'Bậc đào tạo', 'Thời gian', 'Ngành/chuyên ngành', 'Cơ sở đào tạo', 'Quốc gia'],
+      orderedEducation.map((e, i) => [String(i + 1), e.degree || '', yrs(e.start_year, e.end_year), e.major || '', e.institution || '', e.country || '']), 6),
+    ...orderedEducation.filter(e => e.thesis_title).map(e => dash(`${e.degree} (${e.end_year || ''}) – Luận văn/luận án: ${e.thesis_title}`)),
+
     bold('1. Đại học:'),
     kv([
       [['Hệ đào tạo', u1.training_system]],

@@ -2,7 +2,7 @@ import { useUI } from '../ui'
 import AvatarUpload from '../components/AvatarUpload'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, Eye, Lock, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, Eye, Lock, ChevronDown, Save } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import { liveCap, titleCase, capFirst } from '../utils'
@@ -356,12 +356,26 @@ export default function ProfileEdit() {
         <div className="profile-overview-item"><span className="profile-step-num">03</span><div><strong>CV khoa học</strong><small>Công tác, đề tài và giải thưởng</small></div></div>
       </div>
 
+      {/* Thanh thao tác bám ngay dưới thanh điều hướng khi cuộn trang. */}
+      <div className="profile-action-toolbar" aria-label="Thao tác hồ sơ">
+        <div className="profile-action-context" aria-live="polite">
+          {msg ? (
+            <span role="status" className={msg.startsWith('Đã') ? 'profile-action-success' : 'profile-action-error'}>{msg}</span>
+          ) : (
+            <span><strong>Chỉnh sửa hồ sơ</strong><small>Lưu thông tin cá nhân và học thuật bất cứ lúc nào</small></span>
+          )}
+        </div>
+        <button type="submit" form="profile-main-form" className="btn btn-primary profile-action-save" disabled={saving} aria-busy={saving}>
+          <Save size={17} aria-hidden="true" /> {saving ? 'Đang lưu...' : 'Lưu thông tin'}
+        </button>
+      </div>
+
       <div className="acc-tools">
         <button type="button" className="link-btn" onClick={() => setCtl(c => ({ open: true, n: c.n + 1 }))}>Mở tất cả</button>
         <button type="button" className="link-btn" onClick={() => setCtl(c => ({ open: false, n: c.n + 1 }))}>Thu gọn tất cả</button>
       </div>
 
-      <form onSubmit={save} className="profile-main-form">
+      <form id="profile-main-form" onSubmit={save} className="profile-main-form">
         <Collapse title="I. Lý lịch sơ lược" defaultOpen ctl={ctl}>
                     <AvatarUpload researcher={researcher} userId={user.id} onDone={reload} />
           <div className="form-grid profile-fields">
@@ -564,29 +578,7 @@ export default function ProfileEdit() {
           </div>
         </Collapse>
 
-        <Collapse title="IV. Hoạt động chuyên môn bổ sung" ctl={ctl}>
-          <p className="muted">Thông tin này hiển thị với chính bạn và quản trị viên để hỗ trợ kết nối chuyên môn.</p>
-          <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
-            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <input type="checkbox" checked={Boolean(f.available_guest_lecturing)}
-                onChange={e => setF(prev => ({ ...prev, available_guest_lecturing: e.target.checked }))}
-                style={{ width: 18, height: 18, flex: '0 0 18px' }} />
-              Tôi sẵn sàng thỉnh giảng
-            </label>
-            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <input type="checkbox" checked={Boolean(f.available_business_consulting)}
-                onChange={e => setF(prev => ({ ...prev, available_business_consulting: e.target.checked }))}
-                style={{ width: 18, height: 18, flex: '0 0 18px' }} />
-              Tôi sẵn sàng tư vấn doanh nghiệp
-            </label>
-          </div>
-        </Collapse>
 
-        {msg && <div className={msg.startsWith('Đã') ? 'ok-msg' : 'auth-error'} style={{ marginTop: 16 }}>{msg}</div>}
-        <div className="save-bar profile-save-bar">
-          <button className="btn btn-primary" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu thông tin'}</button>
-          <span className="hint">Nhấn lưu để cập nhật các mục phía trên (I, đơn vị, định danh).</span>
-        </div>
       </form>
 
       <ItemSection ctl={ctl}
@@ -610,15 +602,6 @@ export default function ProfileEdit() {
           sub: [i.institution, i.country, yearRange(i.start_year, i.end_year)].filter(Boolean).join(' • '),
           desc: i.thesis_title ? `Luận văn/luận án: ${i.thesis_title}` : '',
         })}
-      />
-
-      <ItemSection ctl={ctl}
-        title="Ngoại ngữ" table="researcher_languages" rid={researcher.id} orderBy="id" asc
-        fields={[
-          { key: 'language', label: 'Ngoại ngữ *', placeholder: 'Tiếng Anh' },
-          { key: 'level', label: 'Mức độ sử dụng', placeholder: 'Tốt (IELTS 7.0)' },
-        ]}
-        render={i => ({ main: i.language, sub: i.level ? `Mức độ sử dụng: ${i.level}` : '' })}
       />
 
       <ItemSection ctl={ctl}
@@ -655,7 +638,7 @@ export default function ProfileEdit() {
       />
 
       <ItemSection ctl={ctl}
-        title="Khen thưởng và giải thưởng"
+        title="V. Khen thưởng và giải thưởng"
         table="researcher_awards" rid={researcher.id} orderBy="year"
         fields={[
           { key: 'title', label: 'Tên khen thưởng *', placeholder: 'Giải nhất sinh viên nghiên cứu khoa học', wide: true },
@@ -664,6 +647,39 @@ export default function ProfileEdit() {
         ]}
         render={i => ({ main: i.title, sub: [i.issuer, i.year].filter(Boolean).join(' • ') })}
       />
+
+      <ItemSection ctl={ctl}
+        title="VI. Ngoại ngữ" table="researcher_languages" rid={researcher.id} orderBy="id" asc
+        fields={[
+          { key: 'language', label: 'Ngoại ngữ *', placeholder: 'Tiếng Anh' },
+          { key: 'level', label: 'Mức độ sử dụng', placeholder: 'Tốt (IELTS 7.0)' },
+        ]}
+        render={i => ({ main: i.language, sub: i.level ? `Mức độ sử dụng: ${i.level}` : '' })}
+      />
+
+      <Collapse title="VII. Hoạt động chuyên môn bổ sung" ctl={ctl}>
+          <p className="muted">Thông tin này hiển thị với chính bạn và quản trị viên để hỗ trợ kết nối chuyên môn.</p>
+          <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input type="checkbox" checked={Boolean(f.available_guest_lecturing)}
+                onChange={e => setF(prev => ({ ...prev, available_guest_lecturing: e.target.checked }))}
+                style={{ width: 18, height: 18, flex: '0 0 18px' }} />
+              Tôi sẵn sàng thỉnh giảng
+            </label>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input type="checkbox" checked={Boolean(f.available_business_consulting)}
+                onChange={e => setF(prev => ({ ...prev, available_business_consulting: e.target.checked }))}
+                style={{ width: 18, height: 18, flex: '0 0 18px' }} />
+              Tôi sẵn sàng tư vấn doanh nghiệp
+            </label>
+          </div>
+        </Collapse>
+
+
+        <p className="hint profile-save-note">
+          <strong>Lưu ý:</strong> Nút “Lưu thông tin” ở góc trên bên phải lưu thông tin cá nhân, học hàm, học vị và lựa chọn chuyên môn.
+          Các dòng đào tạo, công tác, đề tài được lưu riêng khi bạn nhấn “Thêm mục”.
+        </p>
 
       <p className="hint" style={{ marginTop: 18 }}>
         Công trình công bố trong CV được lấy tự động từ các bài <b>đã được duyệt</b> của bạn.

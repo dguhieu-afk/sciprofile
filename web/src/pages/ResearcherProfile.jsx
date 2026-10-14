@@ -8,6 +8,7 @@ import {
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import ExportCvButton from '../components/ExportCvButton'
+import { highestCompletedDegree, sortEducation } from '../academicLogic'
 
 const typeNames = {
   JOURNAL: 'Bài báo', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
@@ -45,7 +46,7 @@ export default function ResearcherProfile() {
           .select('is_corresponding, publications(id,title,publication_type,publication_year,journal,citation_count,status)')
           .eq('researcher_id', id),
       ])
-      setEdu(e.data || []); setExp(x.data || []); setAwards(a.data || [])
+      setEdu(sortEducation(e.data || [])); setExp(x.data || []); setAwards(a.data || [])
       const list = (pa.data || []).map(p => p.publications).filter(p => p && p.status === 'APPROVED')
         .sort((p, q) => (q.publication_year || 0) - (p.publication_year || 0))
       setPubs(list)
@@ -82,7 +83,8 @@ export default function ResearcherProfile() {
 
   const interests = (r.research_interests || '').split(',').map(s => s.trim()).filter(Boolean)
   const isMe = me && me.id === r.id
-  const sub = [r.academic_title, r.academic_degree].filter(Boolean).join(' • ')
+  const currentDegree = highestCompletedDegree(edu)
+  const sub = [r.academic_title, currentDegree?.degree || r.academic_degree].filter(Boolean).join(' • ')
 
   return (
     <main className="container page cv">
@@ -116,13 +118,20 @@ export default function ResearcherProfile() {
         <div className="cv-main">
           {r.bio && <section className="cv-block"><h2>Giới thiệu</h2><p className="abstract">{r.bio}</p></section>}
 
+          {(r.academic_title || currentDegree || r.academic_degree) && (
+            <section className="cv-block"><h2>Học hàm – học vị</h2>
+              <p><b>Học hàm/chức danh:</b> {r.academic_title || 'Chưa khai báo'}{r.title_year ? ` (bổ nhiệm năm ${r.title_year})` : ''}</p>
+              <p><b>Học vị cao nhất:</b> {currentDegree?.degree || r.academic_degree || 'Chưa khai báo'}{(currentDegree?.end_year || r.degree_year) ? ` (cấp năm ${currentDegree?.end_year || r.degree_year})` : ''}{(currentDegree?.country || r.degree_country) ? ` – ${currentDegree?.country || r.degree_country}` : ''}</p>
+            </section>
+          )}
           {edu.length > 0 && (
             <section className="cv-block"><h2>Quá trình đào tạo</h2>
               <div className="timeline">
                 {edu.map(i => (
                   <div className="tl-item" key={i.id}>
                     <b>{i.degree}{i.major ? ` – ${i.major}` : ''}</b>
-                    <span>{[i.institution, yearRange(i.start_year, i.end_year)].filter(Boolean).join(' • ')}</span>
+                    <span>{[i.institution, i.country, yearRange(i.start_year, i.end_year)].filter(Boolean).join(' • ')}</span>
+                    {i.thesis_title && <p>Luận văn/luận án: {i.thesis_title}</p>}
                   </div>
                 ))}
               </div>
