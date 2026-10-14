@@ -17,7 +17,7 @@ const TYPES = {
   'book-chapter': 'BOOK_CHAPTER',
   dissertation: 'THESIS',
 }
-
+const fixCase = s => (s === s.toUpperCase() || s === s.toLowerCase() ? titleCase(s) : s)
 export async function fetchByDoi(doi) {
   const res = await fetch(`https://api.crossref.org/works/${encodeURI(doi)}`)
   if (res.status === 404) throw new Error('Không tìm thấy DOI này trên Crossref. Hãy kiểm tra lại.')

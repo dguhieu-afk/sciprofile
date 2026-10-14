@@ -142,7 +142,7 @@ export default function ResearchDetail() {
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch {
-      alert('Không copy được, hãy bôi đen và copy thủ công.')
+      toast('Không copy được, hãy bôi đen và copy thủ công.', 'error')
     }
   }
 
@@ -247,8 +247,8 @@ export default function ResearchDetail() {
               <dt>ISBN</dt><dd>{pub.isbn || '—'}</dd>
             </dl>
                         {pub.pdf_url ? (
-              <a className="btn btn-primary" style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
-                href={pub.pdf_url} target="_blank" rel="noreferrer">Đọc / tải PDF</a>
+                 <button type="button" className="btn btn-primary" style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
+     onClick={async () => { try { await openFile(pub.pdf_url) } catch (e) { toast(e.message, 'error') } }}>Đọc / tải PDF</button>
             ) : (
               <p className="muted" style={{ marginTop: 16, fontSize: 13 }}>Bài này chưa có file đính kèm.</p>
             )}

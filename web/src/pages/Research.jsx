@@ -127,5 +127,6 @@ export default function Research() {
         )}
       </div>
     </main>
+    
   )
 }
