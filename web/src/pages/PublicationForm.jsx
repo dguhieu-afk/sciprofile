@@ -68,11 +68,11 @@ export default function PublicationForm() {
         publication_authors(author_order,is_corresponding,researchers(id,full_name)),
         publication_research_areas(research_area_id),
         publication_keywords(keywords(name))`).eq('id', id).maybeSingle()
-      if (!p || p.created_by !== user.id || !['DRAFT', 'REJECTED'].includes(p.status)) {
+      if (!p || p.created_by !== user.id || !['DRAFT', 'REJECTED', 'APPROVED'].includes(p.status)) {
         navigate('/dashboard'); return
       }
       setF({
-        title: p.title || '', abstract: p.abstract || '',
+        title: p.title || '', abstract: p.abstract || '', status: p.status,
         publication_type: p.publication_type, publication_year: p.publication_year || '',
         journal: p.journal || '', volume: p.volume || '', issue: p.issue || '', pages: p.pages || '',
         doi: p.doi || '', issn: p.issn || '', isbn: p.isbn || '', pdf_url: p.pdf_url || '',
@@ -181,7 +181,6 @@ export default function PublicationForm() {
     const year = parseInt(f.publication_year, 10)
     if (!year || year < 1950 || year > new Date().getFullYear() + 1) { setErr('Năm công bố không hợp lệ.'); return }
     if (status === 'PENDING') {
-      if (!f.abstract.trim()) { setErr('Cần nhập tóm tắt trước khi gửi duyệt.'); return }
       if (areaIds.length === 0) { setErr('Hãy chọn ít nhất một lĩnh vực trước khi gửi duyệt.'); return }
     }
     setBusy(true)
@@ -248,7 +247,7 @@ export default function PublicationForm() {
     <main className="container page">
       <div className="page-head">
         <h1>{editing ? 'Sửa công trình' : 'Thêm công trình mới'}</h1>
-        <p>Lưu nháp để làm tiếp sau, hoặc gửi duyệt để công trình xuất hiện trong kho công khai.</p>
+        <p>{editing ? 'Bạn có thể cập nhật thông tin công trình. Nếu sửa công trình đã công khai, thay đổi sẽ được gửi duyệt lại trước khi cập nhật công khai.' : 'Lưu nháp để làm tiếp sau, hoặc gửi duyệt để công trình xuất hiện trong kho công khai.'}</p>
       </div>
 
       {!editing && (
@@ -307,7 +306,7 @@ export default function PublicationForm() {
           <label>Tạp chí / Hội nghị / Nhà xuất bản
             <input value={f.journal} onChange={set('journal')} />
           </label>
-          <label className="wide">Tóm tắt
+          <label className="wide">Tóm tắt (không bắt buộc)
             <textarea rows={5} value={f.abstract} onChange={set('abstract')} placeholder="Nghiên cứu này tập trung vào..." />
           </label>
           <label className="wide">Từ khóa (cách nhau bằng dấu phẩy)
@@ -405,7 +404,9 @@ export default function PublicationForm() {
         {err && <div className="auth-error" style={{ marginTop: 16 }}>{err}</div>}
         <p className="hint" style={{ marginTop: 14 }}>Sau khi gửi kiểm duyệt: Chúng tôi sẽ cập nhật dữ liệu cho bạn trong khoảng 1-2 ngày.</p>
         <div className="form-actions">
-          <button className="btn btn-ghost" disabled={busy} onClick={() => save('DRAFT')}>Lưu nháp</button>
+          {!(editing && f.status === 'APPROVED') && (
+            <button className="btn btn-ghost" disabled={busy} onClick={() => save('DRAFT')}>Lưu nháp</button>
+          )}
           <button className="btn btn-primary" disabled={busy} onClick={() => save('PENDING')}>
             {busy ? 'Đang lưu...' : 'Gửi kiểm duyệt'}
           </button>

@@ -108,7 +108,7 @@ export default function Dashboard() {
             <div className="meta">
               <span>{p.citation_count} trích dẫn</span>
               <span className="actions">
-                {p.status === 'APPROVED' && <Link to={`/research/${p.id}`} className="link-btn">Xem công khai</Link>}
+                {p.status === 'APPROVED' && (<> <Link to={`/research/${p.id}`} className="link-btn">Xem công khai</Link> <Link to={`/dashboard/edit/${p.id}`} className="link-btn"><Pencil size={14} /> Sửa</Link> </>)}
                 {(p.status === 'DRAFT' || p.status === 'REJECTED') && (
                   <>
                     <Link to={`/dashboard/edit/${p.id}`} className="link-btn"><Pencil size={14} /> Sửa</Link>
