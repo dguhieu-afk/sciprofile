@@ -22,15 +22,17 @@ export default function Dashboard() {
   const location = useLocation()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [yearFilter, setYearFilter] = useState('ALL')
   const [justSent, setJustSent] = useState(Boolean(location.state?.submitted))
 
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
 
   async function load() {
     if (!user) return
-    const { data } = await supabase.from('publications')
-      .select('id,title,publication_type,publication_year,journal,status,admin_note,citation_count')
+    const { data, error } = await supabase.from('publications')
+      .select('id,title,publication_type,publication_year,journal,status,admin_note,citation_count,doi,created_at')
       .eq('created_by', user.id).order('created_at', { ascending: false })
+    if (error) { toast('Không tải được công trình: ' + error.message, 'error'); setLoading(false); return }
     setItems(data || [])
     setLoading(false)
   }
@@ -63,8 +65,12 @@ export default function Dashboard() {
     load()
   }
 
+  const years = [...new Set(items.map(i => Number(i.publication_year)).filter(Number.isFinite))].sort((a, b) => b - a)
+  const visibleItems = items.filter(i => yearFilter === 'ALL' || String(i.publication_year) === yearFilter)
+    .sort((a, b) => Number(b.publication_year || 0) - Number(a.publication_year || 0) ||
+      new Date(b.created_at || 0) - new Date(a.created_at || 0))
   const count = s => items.filter(i => i.status === s).length
-  const cites = items.filter(i => i.status === 'APPROVED').reduce((s, i) => s + i.citation_count, 0)
+  const cites = items.filter(i => i.status === 'APPROVED').reduce((s, i) => s + Number(i.citation_count || 0), 0)
 
   return (
     <main className="container page">
@@ -87,16 +93,30 @@ export default function Dashboard() {
         <div><XCircle size={18} /><b>{count('REJECTED')}</b><span>Bị từ chối</span></div>
       </div>
 
+      <div className="row-between" style={{ margin: '24px 0 12px', gap: 12, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>Danh sách công trình ({visibleItems.length})</h2>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          Năm công bố
+          <select aria-label="Lọc theo năm công bố" value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
+            <option value="ALL">Tất cả năm</option>
+            {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+          </select>
+        </label>
+      </div>
       <div className="list">
         {loading && <Loading />}
         {!loading && items.length === 0 && (
           <div className="empty">Bạn chưa có công trình nào. Bấm <b>Thêm công trình</b> để bắt đầu.</div>
         )}
-        {items.map(p => (
+        {!loading && items.length > 0 && visibleItems.length === 0 && (
+          <div className="empty">Không có công trình nào trong năm được chọn.</div>
+        )}
+        {visibleItems.map(p => (
           <article className="card result" key={p.id}>
             <div className="row">
               <span className={`status ${statusInfo[p.status].cls}`}>{statusInfo[p.status].label}</span>
-              <span className="authors">{p.publication_year}</span>
+              <span className="authors">Năm công bố: {p.publication_year || 'Chưa rõ'}</span>
+              {p.doi && <span className="authors" title={p.doi}>Có DOI</span>}
             </div>
             <h3>{p.title}</h3>
             <p className="authors">{p.journal}</p>

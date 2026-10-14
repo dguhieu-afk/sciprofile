@@ -190,6 +190,8 @@ export default function ResearcherProfile() {
               <h3><Lock size={14} style={{ verticalAlign: '-1px' }} /> Thông tin riêng tư</h3>
               <p className="muted" style={{ fontSize: 12 }}>Chỉ quản trị viên và chính chủ hồ sơ xem được.</p>
               <dl>
+                <dt>Thỉnh giảng</dt><dd>{priv.available_guest_lecturing ? 'Sẵn sàng' : 'Chưa đăng ký'}</dd>
+                <dt>Tư vấn doanh nghiệp</dt><dd>{priv.available_business_consulting ? 'Sẵn sàng' : 'Chưa đăng ký'}</dd>
                 <dt>Ngày sinh</dt><dd>{priv.birth_date ? new Date(priv.birth_date).toLocaleDateString('vi-VN') : '—'}</dd>
                 <dt>Nơi sinh</dt><dd>{priv.birth_place || '—'}</dd>
                 <dt>Quê quán</dt><dd>{priv.hometown || '—'}</dd>

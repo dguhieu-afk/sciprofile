@@ -204,6 +204,8 @@ export default function ProfileEdit() {
         website: researcher.website || '',
         research_interests: researcher.research_interests || '',
         bio: researcher.bio || '',
+        available_guest_lecturing: pr?.available_guest_lecturing ?? false,
+        available_business_consulting: pr?.available_business_consulting ?? false,
       }))
   }, [researcher])
 
@@ -284,6 +286,8 @@ export default function ProfileEdit() {
       citizen_id: citizenId || null,
       citizen_id_issue_date: f.citizen_id_issue_date || null,
       citizen_id_issued_by: t(f.citizen_id_issued_by),
+      available_guest_lecturing: Boolean(f.available_guest_lecturing),
+      available_business_consulting: Boolean(f.available_business_consulting),
       birth_date: f.birth_date || null, birth_place: t(f.birth_place),
       hometown: t(f.hometown), ethnicity: t(f.ethnicity), address: t(f.address),
       phone: phone || null, phone_office: phoneO || null, phone_home: phoneH || null, fax: t(f.fax),
@@ -509,6 +513,24 @@ export default function ProfileEdit() {
             </label>
             <label className="wide">Tiểu sử tóm tắt
               <textarea rows={4} value={f.bio} onChange={setFirst('bio')} placeholder="Vài dòng giới thiệu về hướng nghiên cứu và thành tựu của bạn..." />
+            </label>
+          </div>
+        </Collapse>
+
+        <Collapse title="IV. Hoạt động chuyên môn bổ sung" ctl={ctl}>
+          <p className="muted">Thông tin này hiển thị với chính bạn và quản trị viên để hỗ trợ kết nối chuyên môn.</p>
+          <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input type="checkbox" checked={Boolean(f.available_guest_lecturing)}
+                onChange={e => setF(prev => ({ ...prev, available_guest_lecturing: e.target.checked }))}
+                style={{ width: 18, height: 18, flex: '0 0 18px' }} />
+              Tôi sẵn sàng thỉnh giảng
+            </label>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input type="checkbox" checked={Boolean(f.available_business_consulting)}
+                onChange={e => setF(prev => ({ ...prev, available_business_consulting: e.target.checked }))}
+                style={{ width: 18, height: 18, flex: '0 0 18px' }} />
+              Tôi sẵn sàng tư vấn doanh nghiệp
             </label>
           </div>
         </Collapse>

@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext'
 import { useUI } from '../ui'
 import { approvePub } from '../review'
 import Loading from '../components/Loading'
+import ExportCvButton from '../components/ExportCvButton'
 
 const typeNames = {
   JOURNAL: 'Bài báo', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
@@ -41,7 +42,7 @@ export default function Admin() {
       supabase.from('publications')
         .select('id,title,abstract,doi,publication_type,publication_year,journal,created_at,publication_authors(author_order,researchers(full_name))')
         .eq('status', 'PENDING').order('created_at'),
-      supabase.from('profiles').select('id,email,role,created_at,researchers(full_name)').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id,email,role,created_at,researchers(id,full_name)').order('created_at', { ascending: false }),
       supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
       supabase.from('publications').select('*', { count: 'exact', head: true }).eq('status', 'APPROVED'),
       supabase.from('publications').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
@@ -146,6 +147,7 @@ export default function Admin() {
   if (!isAdmin) return <main className="container page"><Loading text="Đang kiểm tra quyền..." /></main>
 
   const nameOf = u => (Array.isArray(u.researchers) ? u.researchers[0] : u.researchers)?.full_name || '—'
+  const researcherOf = u => Array.isArray(u.researchers) ? u.researchers[0] : u.researchers
 
   return (
     <main className="container page">
@@ -230,7 +232,7 @@ export default function Admin() {
       {tab === 'users' && (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Họ tên</th><th>Email</th><th>Ngày tạo</th><th>Vai trò</th><th></th></tr></thead>
+            <thead><tr><th>Họ tên</th><th>Email</th><th>Ngày tạo</th><th>Vai trò</th><th>CV / Hồ sơ</th><th></th></tr></thead>
             <tbody>
               {users.map(u => (
                 <tr key={u.id}>
@@ -239,6 +241,14 @@ export default function Admin() {
                     <select value={u.role} disabled={u.id === user.id} onChange={e => changeRole(u, e.target.value)}>
                       <option>ADMIN</option><option>RESEARCHER</option><option>USER</option>
                     </select>
+                  </td>
+                  <td>
+                    {researcherOf(u)?.id ? (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Link className="btn btn-ghost" to={`/researchers/${researcherOf(u).id}`}>Xem CV</Link>
+                        <ExportCvButton researcherId={researcherOf(u).id} className="btn btn-ghost" />
+                      </div>
+                    ) : <span className="muted">Chưa có hồ sơ</span>}
                   </td>
                   <td>
                     {u.id === user.id || u.role === 'ADMIN'
