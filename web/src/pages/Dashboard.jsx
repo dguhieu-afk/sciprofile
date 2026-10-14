@@ -52,13 +52,14 @@ export default function Dashboard() {
 
   async function remove(id) {
     const ok = await confirm({
-      title: 'Xóa bản nháp này?', message: 'Thao tác này không thể hoàn tác.',
+      title: 'Xóa công trình này?', message: 'Công trình sẽ bị xóa vĩnh viễn, kể cả khi đã công khai. Thao tác này không thể hoàn tác.',
       confirmText: 'Xóa', danger: true,
     })
     if (!ok) return
-    const { error } = await supabase.from('publications').delete().eq('id', id)
+    const { data, error } = await supabase.from('publications').delete().eq('id', id).eq('created_by', user.id).select('id')
     if (error) { toast('Không xóa được: ' + error.message, 'error'); return }
-    toast('Đã xóa bản nháp.', 'success')
+    if (!data?.length) { toast('Không thể xóa công trình. Hãy kiểm tra quyền xóa trong Supabase.', 'error'); return }
+    toast('Đã xóa công trình.', 'success')
     load()
   }
 
@@ -115,7 +116,7 @@ export default function Dashboard() {
                     <button className="link-btn" onClick={() => submitForReview(p.id)}><Send size={14} /> Gửi duyệt</button>
                   </>
                 )}
-                {p.status === 'DRAFT' && (
+                {(p.status === 'DRAFT' || p.status === 'PENDING' || p.status === 'REJECTED' || p.status === 'APPROVED' || p.status === 'ARCHIVED') && (
                   <button className="link-btn danger" onClick={() => remove(p.id)}><Trash2 size={14} /> Xóa</button>
                 )}
               </span>
