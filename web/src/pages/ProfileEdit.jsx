@@ -1,6 +1,6 @@
 import { useUI } from '../ui'
 import AvatarUpload from '../components/AvatarUpload'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Eye, Lock, ChevronDown } from 'lucide-react'
 import { supabase } from '../supabase'
@@ -129,8 +129,48 @@ export default function ProfileEdit() {
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
   const [ctl, setCtl] = useState({ open: false, n: 0 })
+  const [addressSuggestions, setAddressSuggestions] = useState([])
+  const [addressLoading, setAddressLoading] = useState(false)
+  const addressInputRef = useRef(null)
 
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
+
+  // Gợi ý địa chỉ hành chính Việt Nam miễn phí, không cần API key.
+  // API gợi ý tỉnh/thành và phường/xã; không thay thế tìm số nhà/toạ độ như Google Maps.
+  useEffect(() => {
+    const query = String(f?.address || '').trim()
+    if (query.length < 2) {
+      setAddressSuggestions([])
+      setAddressLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      setAddressLoading(true)
+      try {
+        const url = `https://tinhthanhpho.com/api/v1/suggest?q=${encodeURIComponent(query)}&limit=6`
+        const response = await fetch(url, { headers: { Accept: 'application/json' } })
+        if (!response.ok) throw new Error('Không lấy được gợi ý địa chỉ')
+        const payload = await response.json()
+        const rows = Array.isArray(payload) ? payload : (payload.data?.items || payload.items || payload.data || [])
+        const suggestions = rows.map(item => {
+          if (typeof item === 'string') return item
+          return item.label || item.display || item.full_name || item.name || ''
+        }).filter(Boolean).slice(0, 6)
+        if (!cancelled) setAddressSuggestions([...new Set(suggestions)])
+      } catch {
+        if (!cancelled) setAddressSuggestions([])
+      } finally {
+        if (!cancelled) setAddressLoading(false)
+      }
+    }, 300)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [f?.address])
 
   useEffect(() => {
     if (!researcher) return
@@ -141,7 +181,7 @@ export default function ProfileEdit() {
         birth_date: pr?.birth_date || '',
         citizen_id: pr?.citizen_id || '',
         citizen_id_issue_date: pr?.citizen_id_issue_date || '',
-        citizen_id_issued_by: pr?.citizen_id_issued_by || '',
+        citizen_id_issued_by: pr?.citizen_id_issued_by || 'Cục Cảnh sát quản lý hành chính về trật tự xã hội.',
         birth_place: pr?.birth_place || '',
         hometown: pr?.hometown || '',
         ethnicity: pr?.ethnicity || '',
@@ -280,13 +320,13 @@ export default function ProfileEdit() {
             <label className="wide">Họ và tên *
               <input value={f.full_name} onChange={e => setF({ ...f, full_name: liveCap(e.target.value) })} placeholder="Nguyễn Văn A" />
             </label>
-            <label>Giới tính
+            <label style={{ maxWidth: 240 }}>Giới tính
               <select value={f.gender} onChange={set('gender')}>
                 <option value="">-- Chọn --</option>
                 <option>Nam</option><option>Nữ</option><option>Khác</option>
               </select>
             </label>
-            <label><span className="lock"><Lock size={12} /> Ngày sinh</span>
+            <label style={{ maxWidth: 240 }}><span className="lock"><Lock size={12} /> Ngày sinh</span>
               <input type="date" value={f.birth_date} max={today} onChange={set('birth_date')} />
             </label>
             <label>
@@ -322,7 +362,7 @@ export default function ProfileEdit() {
               <input
                 value={f.citizen_id_issued_by || ''}
                 onChange={e => setF(prev => ({ ...prev, citizen_id_issued_by: e.target.value }))}
-                placeholder="Cơ quan cấp"
+                placeholder="Cục Cảnh sát quản lý hành chính về trật tự xã hội."
               />
             </label>
             <label>
@@ -360,7 +400,28 @@ export default function ProfileEdit() {
               <input value={f.nationality} onChange={setCap('nationality')} />
             </label>
             <label className="wide"><span className="lock"><Lock size={12} /> Chỗ ở riêng hoặc địa chỉ liên lạc</span>
-              <input value={f.address} onChange={setCap('address')} />
+              <input ref={addressInputRef} value={f.address} onChange={setCap('address')} placeholder="Nhập địa chỉ, phường/xã hoặc tỉnh/thành" autoComplete="off" aria-autocomplete="list" />
+              {addressLoading && <small style={{ color: '#64748b' }}>Đang tìm gợi ý địa chỉ…</small>}
+              {addressSuggestions.length > 0 && (
+                <div role="listbox" aria-label="Gợi ý địa chỉ" style={{ marginTop: 6, border: '1px solid #dbe3ef', borderRadius: 10, background: '#fff', boxShadow: '0 8px 20px rgba(15,23,42,.08)', overflow: 'hidden' }}>
+                  {addressSuggestions.map((suggestion, index) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      key={`${suggestion}-${index}`}
+                      onClick={() => {
+                        setF(prev => ({ ...prev, address: suggestion }))
+                        setAddressSuggestions([])
+                      }}
+                      style={{ display: 'block', width: '100%', padding: '10px 12px', textAlign: 'left', border: 0, borderBottom: index === addressSuggestions.length - 1 ? 0 : '1px solid #eef2f7', background: '#fff', cursor: 'pointer', color: '#1e293b' }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <small style={{ color: '#64748b' }}>Gợi ý miễn phí cho đơn vị hành chính Việt Nam; bạn vẫn có thể tự nhập số nhà và tên đường.</small>
             </label>
             <label><span className="lock"><Lock size={12} /> Điện thoại cơ quan (CQ)</span>
               <input type="tel" value={f.phone_office} onChange={set('phone_office')} placeholder="Ví dụ: 02812345678" />
