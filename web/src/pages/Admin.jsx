@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Check, X, ShieldCheck, Users, FileClock, ScrollText } from 'lucide-react'
+import { Check, X, ShieldCheck, Users, FileClock, ScrollText, Trash2, Search } from 'lucide-react'
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import { useUI } from '../ui'
@@ -11,7 +11,11 @@ const typeNames = {
   JOURNAL: 'Bài báo', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
   BOOK_CHAPTER: 'Chương sách', THESIS: 'Luận văn', RESEARCH_PROJECT: 'Đề tài', OTHER: 'Khác',
 }
+const statusName = { DRAFT: 'Bản nháp', PENDING: 'Chờ duyệt', APPROVED: 'Đã công khai', REJECTED: 'Bị từ chối', ARCHIVED: 'Lưu trữ' }
+const statusCls = { DRAFT: 's-draft', PENDING: 's-pending', APPROVED: 's-ok', REJECTED: 's-bad', ARCHIVED: 's-draft' }
 const fmt = d => new Date(d).toLocaleString('vi-VN')
+const clean = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
 
 export default function Admin() {
   const { user, profile, isAdmin, ready } = useAuth()
@@ -19,9 +23,12 @@ export default function Admin() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('pending')
   const [pending, setPending] = useState([])
+  const [allPubs, setAllPubs] = useState([])
   const [users, setUsers] = useState([])
   const [logs, setLogs] = useState([])
   const [stats, setStats] = useState({})
+  const [q, setQ] = useState('')
+  const [st, setSt] = useState('')
 
   useEffect(() => {
     if (!ready) return
@@ -30,7 +37,7 @@ export default function Admin() {
   }, [ready, user, profile, isAdmin, navigate])
 
   async function loadAll() {
-    const [p, u, l, a, pe, us] = await Promise.all([
+    const [p, u, l, a, pe, us, ap] = await Promise.all([
       supabase.from('publications')
         .select('id,title,abstract,doi,publication_type,publication_year,journal,created_at,publication_authors(author_order,researchers(full_name))')
         .eq('status', 'PENDING').order('created_at'),
@@ -39,8 +46,11 @@ export default function Admin() {
       supabase.from('publications').select('*', { count: 'exact', head: true }).eq('status', 'APPROVED'),
       supabase.from('publications').select('*', { count: 'exact', head: true }).eq('status', 'PENDING'),
       supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('publications')
+        .select('id,title,status,publication_year,created_at,pdf_url,publication_authors(author_order,researchers(full_name))')
+        .order('created_at', { ascending: false }).limit(500),
     ])
-    setPending(p.data || []); setUsers(u.data || []); setLogs(l.data || [])
+    setPending(p.data || []); setUsers(u.data || []); setLogs(l.data || []); setAllPubs(ap.data || [])
     setStats({ approved: a.count, pending: pe.count, users: us.count })
   }
   useEffect(() => { if (isAdmin) loadAll() }, [isAdmin])
@@ -72,6 +82,24 @@ export default function Admin() {
     loadAll()
   }
 
+  async function deletePub(p) {
+    const ok = await confirm({
+      title: 'Xóa công trình này?',
+      message: `"${p.title}" sẽ bị xóa vĩnh viễn cùng danh sách tác giả, lượt yêu thích và báo cáo liên quan. Không thể hoàn tác.`,
+      confirmText: 'Xóa vĩnh viễn', danger: true,
+    })
+    if (!ok) return
+    const { error } = await supabase.from('publications').delete().eq('id', p.id)
+    if (error) { toast('Không xóa được: ' + error.message, 'error'); return }
+    // Xóa file đính kèm nếu nằm trong kho của hệ thống
+    if (p.pdf_url && !/^https?:\/\//i.test(p.pdf_url)) {
+      await supabase.storage.from('documents').remove([p.pdf_url])
+    }
+    await log('DELETE_PUBLICATION', 'PUBLICATION', p.id, { title: p.title, status: p.status }, null)
+    toast('Đã xóa công trình.', 'success')
+    loadAll()
+  }
+
   async function changeRole(u, role) {
     const ok = await confirm({
       title: 'Đổi vai trò người dùng?', message: `${u.email}: ${u.role} → ${role}`, confirmText: 'Đổi vai trò',
@@ -83,6 +111,37 @@ export default function Admin() {
     toast('Đã đổi vai trò.', 'success')
     loadAll()
   }
+
+  async function deleteUser(u) {
+    // Bước 1: gõ lại email để xác nhận
+    const typed = await prompt({
+      title: 'Xóa tài khoản người dùng?',
+      message: `Tài khoản ${u.email} sẽ không thể đăng nhập nữa. Thao tác không thể hoàn tác.`,
+      label: 'Gõ lại email của tài khoản để xác nhận', placeholder: u.email,
+      confirmText: 'Tiếp tục', danger: true, required: true,
+    })
+    if (typed === null) return
+    if (typed.trim().toLowerCase() !== u.email.toLowerCase()) {
+      toast('Email xác nhận không khớp, chưa xóa gì.', 'error'); return
+    }
+    // Bước 2: giữ hay xóa công trình của họ (Esc hoặc bấm Giữ lại = giữ)
+    const removeContent = await confirm({
+      title: 'Xử lý hồ sơ và công trình của tài khoản này',
+      message: 'Chọn "Xóa cả công trình" để xóa luôn hồ sơ nhà nghiên cứu và mọi công trình tài khoản này đã đăng. Chọn "Giữ lại" để chỉ xóa tài khoản (hồ sơ và bài vẫn còn, hiển thị là chưa có tài khoản).',
+      confirmText: 'Xóa cả công trình', cancelText: 'Giữ lại', danger: true,
+    })
+    const { error } = await supabase.rpc('admin_delete_user', { uid: u.id, remove_content: removeContent })
+    if (error) { toast('Không xóa được: ' + error.message, 'error'); return }
+    toast('Đã xóa tài khoản.', 'success')
+    loadAll()
+  }
+
+  const shownPubs = useMemo(() => {
+    const k = clean(q.trim())
+    return allPubs.filter(p =>
+      (!st || p.status === st) &&
+      (!k || clean(p.title + ' ' + p.publication_authors.map(a => a.researchers.full_name).join(' ')).includes(k)))
+  }, [allPubs, q, st])
 
   if (!isAdmin) return <main className="container page"><Loading text="Đang kiểm tra quyền..." /></main>
 
@@ -101,9 +160,10 @@ export default function Admin() {
         <div><FileClock size={18} /><b>{stats.pending ?? '…'}</b><span>Đang chờ duyệt</span></div>
       </div>
 
-      <div className="cite-tabs" style={{ marginBottom: 16 }}>
+      <div className="cite-tabs" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
         <button className={tab === 'pending' ? 'on' : ''} onClick={() => setTab('pending')}>Chờ duyệt ({pending.length})</button>
-        <button className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Người dùng</button>
+        <button className={tab === 'pubs' ? 'on' : ''} onClick={() => setTab('pubs')}>Công trình ({allPubs.length})</button>
+        <button className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Người dùng ({users.length})</button>
         <button className={tab === 'logs' ? 'on' : ''} onClick={() => setTab('logs')}><ScrollText size={13} /> Nhật ký</button>
       </div>
 
@@ -132,10 +192,45 @@ export default function Admin() {
         </div>
       )}
 
+      {tab === 'pubs' && (
+        <>
+          <div className="filters" style={{ gridTemplateColumns: '2fr 1fr', marginTop: 0 }}>
+            <div className="filter-search">
+              <Search size={18} color="#64748b" />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm theo tiêu đề hoặc tác giả..." />
+            </div>
+            <select value={st} onChange={e => setSt(e.target.value)}>
+              <option value="">Mọi trạng thái</option>
+              {Object.entries(statusName).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </div>
+          <div className="result-bar"><span>{shownPubs.length} công trình</span></div>
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Tiêu đề</th><th>Tác giả</th><th>Trạng thái</th><th>Ngày tạo</th><th></th></tr></thead>
+              <tbody>
+                {shownPubs.length === 0 && <tr><td colSpan="5" className="muted">Không có công trình phù hợp.</td></tr>}
+                {shownPubs.map(p => (
+                  <tr key={p.id}>
+                    <td style={{ maxWidth: 320 }}>
+                      <Link to={p.status === 'PENDING' ? `/admin/review/${p.id}` : `/research/${p.id}`} className="link-btn">{p.title}</Link>
+                    </td>
+                    <td>{[...p.publication_authors].sort((a, b) => a.author_order - b.author_order).map(a => a.researchers.full_name).join(', ')}</td>
+                    <td><span className={`status ${statusCls[p.status]}`}>{statusName[p.status]}</span></td>
+                    <td>{new Date(p.created_at).toLocaleDateString('vi-VN')}</td>
+                    <td><button className="link-btn danger" onClick={() => deletePub(p)}><Trash2 size={14} /> Xóa</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
       {tab === 'users' && (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Họ tên</th><th>Email</th><th>Ngày tạo</th><th>Vai trò</th></tr></thead>
+            <thead><tr><th>Họ tên</th><th>Email</th><th>Ngày tạo</th><th>Vai trò</th><th></th></tr></thead>
             <tbody>
               {users.map(u => (
                 <tr key={u.id}>
@@ -144,6 +239,11 @@ export default function Admin() {
                     <select value={u.role} disabled={u.id === user.id} onChange={e => changeRole(u, e.target.value)}>
                       <option>ADMIN</option><option>RESEARCHER</option><option>USER</option>
                     </select>
+                  </td>
+                  <td>
+                    {u.id === user.id || u.role === 'ADMIN'
+                      ? <span className="muted" style={{ fontSize: 12 }}>{u.id === user.id ? 'Tài khoản của bạn' : 'Hạ quyền để xóa'}</span>
+                      : <button className="link-btn danger" onClick={() => deleteUser(u)}><Trash2 size={14} /> Xóa</button>}
                   </td>
                 </tr>
               ))}
