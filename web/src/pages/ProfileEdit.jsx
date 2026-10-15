@@ -93,9 +93,21 @@ function ProvinceAutocomplete({ label, value, onChange, items = vietnamProvinces
 
 // Đối chiếu địa danh trước khi ghi vào CSDL. Không dựa vào riêng HTML validation.
 const validProvince = value => vietnamProvinces.includes(String(value || '').trim())
-const validCivilDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) &&
-  !Number.isNaN(Date.parse(`${value}T00:00:00`)) &&
-  new Date(`${value}T00:00:00`).toISOString().slice(0, 10) === value
+// Kiểm tra ngày theo lịch, không chuyển múi giờ để tránh lệch một ngày ở Việt Nam.
+const validCivilDate = value => {
+  const text = String(value || '')
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(0)
+  date.setUTCFullYear(year, month - 1, day)
+  date.setUTCHours(0, 0, 0, 0)
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+}
 
 // Danh mục gợi ý phổ biến, không phải danh sách chứng chỉ toàn cầu đầy đủ.
 // Người dùng luôn có thể nhập tên ngôn ngữ/chứng chỉ khác.
