@@ -17,6 +17,7 @@ import AdminReports from './pages/AdminReports'
 import Favorites from './pages/Favorites'
 import Network from './pages/Network'
 import Stats from './pages/Stats'
+import ResearchCollaboration from './pages/ResearchCollaboration'
 
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/researchers/:id" element={<ResearcherProfile />} />
         <Route path="/network" element={<Network />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/collaboration" element={<ResearchCollaboration />} />
         <Route path="/profile/edit" element={<ProfileEdit />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/new" element={<PublicationForm />} />

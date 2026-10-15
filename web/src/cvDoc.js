@@ -134,7 +134,8 @@ export function buildCvDoc(d) {
       [['Cơ quan cấp CCCD', p.citizen_id_issued_by]],
       [['Quê quán', p.hometown], ['Dân tộc', p.ethnicity]],
       [['Học vị cao nhất', highest?.degree || reportedHighest || 'Chưa có dữ liệu đào tạo xác minh'], ['Năm, nước nhận học vị', degreeYear]],
-      [['Học hàm được công nhận', academicRank], ['Năm công nhận học hàm', academicRank && r.title_year]],
+      [['Học hàm cao nhất', academicRank], ['Năm công nhận học hàm cao nhất', academicRank && r.title_year]],
+      [['Phó giáo sư – năm công nhận', p.associate_professor_year], ['Giáo sư – năm công nhận', p.professor_year]],
       [['Chức danh nghề nghiệp', professional], ['Năm bổ nhiệm chức danh nghề nghiệp', professional && r.professional_title_year]],
       [['Chức vụ (hiện tại hoặc trước khi nghỉ hưu)', r.position]],
       [['Đơn vị công tác (hiện tại hoặc trước khi nghỉ hưu)', orgChain]],
@@ -188,10 +189,11 @@ export function buildCvDoc(d) {
       projects.map((x, i) => [String(i + 1), x.title, `${x.start_year || ''}/${x.end_year || ''}`, x.level || '', x.role || '']), 5),
 
     para([t('')], { spacing: { after: 60 } }),
-    para('2. Các công trình khoa học đã công bố (thuộc danh mục Hội đồng Chức danh giáo sư nhà nước quy định): Tên công trình, năm công bố, nơi công bố.'),
-    grid([650, 3850, 1700, 3098],
-      ['TT', 'Tên công trình', 'Năm công bố', 'Tên tạp chí'],
-      pubs.map((x, i) => [String(i + 1), x.title, String(x.publication_year || ''), x.journal || '']), 4),
+    para('2. Danh mục công trình từ hồ sơ UTEProfile (phân biệt công khai và chờ kiểm duyệt).'),
+    grid([650, 3450, 1200, 2598, 1400],
+      ['TT', 'Tên công trình', 'Năm', 'Tạp chí / nơi công bố', 'Trạng thái'],
+      pubs.map((x, i) => [String(i + 1), x.title || '', String(x.publication_year || ''), x.journal || '',
+        x.status === 'APPROVED' ? 'Đã công khai' : x.status === 'PENDING' ? 'Chờ duyệt' : x.status === 'REJECTED' ? 'Bị từ chối' : (x.status || 'Bản nháp')]), 5),
 
     para([t('')], { spacing: { after: 200 } }),
     mkTable([3600, 5698], [new TableRow({ cantSplit: true, children: [

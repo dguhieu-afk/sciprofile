@@ -1,8 +1,7 @@
 import { useRouteTitle } from '../useRouteTitle'
-import '../UTEAnimations.css'
 import Avatar from './Avatar'
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   GraduationCap, LogOut, ChevronDown, UserCircle, Eye, FolderOpen,
   Heart, ShieldCheck,
@@ -12,7 +11,6 @@ import { useAuth } from '../AuthContext'
 export default function Layout() {
   const { user, researcher, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
   useRouteTitle()
   const [open, setOpen] = useState(false)
   const box = useRef(null)
@@ -37,8 +35,9 @@ export default function Layout() {
           <nav className="nav-links">
             <NavLink to="/research">Kho nghiên cứu</NavLink>
             <NavLink to="/researchers">Nhà nghiên cứu</NavLink>
-            <NavLink to="/network">Mạng lưới</NavLink>
-            <NavLink to="/stats">Thống kê</NavLink>
+            {user && <NavLink to="/profile/edit">Hồ sơ của tôi</NavLink>}
+            {user && <NavLink to="/dashboard">Công trình của tôi</NavLink>}
+            {isAdmin && <NavLink to="/admin">Quản trị</NavLink>}
           </nav>
 
           <div className="nav-actions">
@@ -51,16 +50,8 @@ export default function Layout() {
                 </button>
                 {open && (
                   <div className="menu" onClick={() => setOpen(false)}>
-                    <Link to="/profile/edit"><UserCircle size={16} /> Chỉnh sửa hồ sơ</Link>
                     {researcher && <Link to={`/researchers/${researcher.id}`}><Eye size={16} /> Hồ sơ công khai</Link>}
-                    <Link to="/dashboard"><FolderOpen size={16} /> Công trình của tôi</Link>
                     <Link to="/favorites"><Heart size={16} /> Yêu thích</Link>
-                    {isAdmin && (
-                      <>
-                        <div className="menu-label">DÀNH CHO QUẢN TRỊ VIÊN</div>
-                        <Link to="/admin"><ShieldCheck size={16} /> Trung tâm quản trị Admin</Link>
-                      </>
-                    )}
                     <div className="menu-sep" />
                     <button onClick={async () => { await signOut(); navigate('/') }}>
                       <LogOut size={16} /> Đăng xuất
@@ -78,9 +69,7 @@ export default function Layout() {
         </div>
       </header>
 
-      <div className="ute-route-enter" key={location.pathname}>
-        <Outlet />
-      </div>
+      <Outlet />
 
       <footer className="footer">
         © 2026 UTEProfile – Phát triển by nguyentrunghieu - dguhieu@gmail.com

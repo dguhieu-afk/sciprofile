@@ -8,6 +8,12 @@
 .professional-profile .profile-hero .actions { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
 .professional-profile .profile-hero .btn { border: 1px solid #d8f5ee; background: white; color: #07594f; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .professional-profile .profile-hero .btn:hover { background: #e7faf5; }
+.professional-profile .profile-overview { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid var(--profile-border); border-radius: 18px; background: #fff; overflow: hidden; box-shadow: 0 5px 20px rgba(14,42,52,.035); }
+.professional-profile .profile-overview-item { display: flex; gap: 13px; padding: 18px 20px; align-items: center; }
+.professional-profile .profile-overview-item + .profile-overview-item { border-left: 1px solid #edf2f2; }
+.professional-profile .profile-step-num { display: grid; place-items: center; width: 37px; height: 37px; flex: 0 0 37px; border-radius: 11px; background: #e3f4f0; color: #08766e; font-weight: 750; font-size: 13px; }
+.professional-profile .profile-overview-item strong { display: block; font-size: 14px; color: var(--profile-ink); }
+.professional-profile .profile-overview-item small { display: block; font-size: 12px; color: #627789; margin-top: 3px; }
 .professional-profile .acc-tools { margin-top: 18px; margin-bottom: 12px; }
 .professional-profile .acc-tools button { font-weight: 650; }
 .professional-profile .profile-section { border-radius: 17px; border: 1px solid var(--profile-border); background: white; box-shadow: 0 4px 18px rgba(22,64,70,.045); margin-top: 13px; }
@@ -40,7 +46,7 @@
 .professional-profile .profile-save-bar .btn { padding: 12px 22px; }
 .professional-profile .profile-save-bar .hint { font-size: 12px; }
 @media (max-width: 1050px) { .professional-profile .profile-hero { align-items: flex-start; } .professional-profile .profile-fields, .professional-profile .add-form .form-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-@media (max-width: 700px) { .professional-profile .profile-hero { padding: 25px 20px; } .professional-profile .profile-hero .actions { width: 100%; margin-top: 18px; } .professional-profile .profile-fields, .professional-profile .add-form .form-grid { grid-template-columns: minmax(0,1fr); gap: 16px; } .professional-profile .profile-fields > .profile-compact { max-width: none; } .professional-profile .profile-section .acc-head { padding: 17px; font-size: 16px; } .professional-profile .profile-section .acc-body { padding: 19px 17px 23px; } .professional-profile .profile-save-bar { bottom: 8px; } .professional-profile .profile-save-bar .btn { width: 100%; } }
+@media (max-width: 700px) { .professional-profile .profile-hero { padding: 25px 20px; } .professional-profile .profile-hero .actions { width: 100%; margin-top: 18px; } .professional-profile .profile-overview { grid-template-columns: 1fr; } .professional-profile .profile-overview-item { padding: 12px 16px; } .professional-profile .profile-overview-item + .profile-overview-item { border-left: 0; border-top: 1px solid #edf2f2; } .professional-profile .profile-fields, .professional-profile .add-form .form-grid { grid-template-columns: minmax(0,1fr); gap: 16px; } .professional-profile .profile-fields > .profile-compact { max-width: none; } .professional-profile .profile-section .acc-head { padding: 17px; font-size: 16px; } .professional-profile .profile-section .acc-body { padding: 19px 17px 23px; } .professional-profile .profile-save-bar { bottom: 8px; } .professional-profile .profile-save-bar .btn { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .professional-profile * { transition: none !important; } }
 
 /* Thanh lưu ở góc phải: luôn sẵn sàng khi cuộn, không che nội dung. */
@@ -161,3 +167,24 @@
   .professional-profile .profile-tab-panel .profile-panel-title { padding: 18px 17px 0; }
   .professional-profile .profile-tab-hint { font-size: 11px; }
 }
+
+/* UTEProfile UX compact: thống nhất chiều cao, tiết kiệm không gian nhưng giữ vùng bấm đủ lớn */
+.professional-profile .profile-section .acc-body { padding: 16px 20px 20px; }
+.professional-profile .profile-section .acc-head { padding: 13px 18px; }
+.professional-profile .profile-fields,
+.professional-profile .add-form .form-grid { gap: 11px 14px; }
+.professional-profile .form-card label { font-size: 12.5px; }
+.professional-profile .form-card input:not([type='checkbox']),
+.professional-profile .form-card select { min-height: 39px; padding: 7px 11px; font-size: 14px; }
+.professional-profile .form-card textarea { min-height: 76px; padding: 9px 11px; font-size: 14px; }
+.professional-profile .profile-form-group-title { margin-top: 2px; padding: 4px 0 7px; }
+.professional-profile .profile-section-intro { margin-bottom: 12px; padding: 9px 12px; }
+.professional-profile .item { padding: 10px 13px; }
+.professional-profile .add-form { margin-top: 12px; padding-top: 12px; }
+.professional-profile .profile-collab-options { margin: 7px 0 0; padding: 12px 14px; border: 1px solid #d8e5ea; border-radius: 12px; }
+.professional-profile .profile-collab-options legend { padding: 0 5px; font-weight: 750; color: #17364b; }
+.professional-profile .profile-collab-option { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; cursor: pointer; }
+.professional-profile .profile-collab-option + .profile-collab-option { border-top: 1px solid #edf2f6; }
+.professional-profile .profile-collab-option input[type='checkbox'] { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+.professional-profile .profile-collab-option small { display: block; margin-top: 2px; font-weight: 400; font-size: 12px; color: #64748b; }
+@media(max-width:700px) { .professional-profile .profile-section .acc-body {padding:15px 14px 20px} .professional-profile .profile-fields, .professional-profile .add-form .form-grid {gap:12px} }

@@ -8,7 +8,6 @@ import {
 import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import ExportCvButton from '../components/ExportCvButton'
-import { highestCompletedDegree, sortEducation, isAcademicRank, PROFESSIONAL_TITLES } from '../academicLogic'
 
 const typeNames = {
   JOURNAL: 'Bài báo', CONFERENCE: 'Hội nghị', BOOK: 'Sách',
@@ -46,7 +45,7 @@ export default function ResearcherProfile() {
           .select('is_corresponding, publications(id,title,publication_type,publication_year,journal,citation_count,status)')
           .eq('researcher_id', id),
       ])
-      setEdu(sortEducation(e.data || [])); setExp(x.data || []); setAwards(a.data || [])
+      setEdu(e.data || []); setExp(x.data || []); setAwards(a.data || [])
       const list = (pa.data || []).map(p => p.publications).filter(p => p && p.status === 'APPROVED')
         .sort((p, q) => (q.publication_year || 0) - (p.publication_year || 0))
       setPubs(list)
@@ -83,8 +82,7 @@ export default function ResearcherProfile() {
 
   const interests = (r.research_interests || '').split(',').map(s => s.trim()).filter(Boolean)
   const isMe = me && me.id === r.id
-  const currentDegree = highestCompletedDegree(edu)
-  const sub = [isAcademicRank(r.academic_title) ? r.academic_title : null, currentDegree?.degree || (edu.length === 0 ? r.academic_degree : null)].filter(Boolean).join(' • ')
+  const sub = [r.academic_title, r.academic_degree].filter(Boolean).join(' • ')
 
   return (
     <main className="container page cv">
@@ -118,21 +116,13 @@ export default function ResearcherProfile() {
         <div className="cv-main">
           {r.bio && <section className="cv-block"><h2>Giới thiệu</h2><p className="abstract">{r.bio}</p></section>}
 
-          {(r.academic_title || r.professional_title || currentDegree || r.academic_degree) && (
-            <section className="cv-block"><h2>Học hàm – học vị</h2>
-              <p><b>Học hàm:</b> {isAcademicRank(r.academic_title) ? `${r.academic_title}${r.title_year ? ` (công nhận năm ${r.title_year})` : ''}` : 'Chưa có thông tin công nhận PGS/GS'}</p>
-              <p><b>Chức danh nghề nghiệp:</b> {r.professional_title || (PROFESSIONAL_TITLES.includes(r.academic_title) ? r.academic_title : 'Chưa khai báo')}{r.professional_title_year ? ` (bổ nhiệm năm ${r.professional_title_year})` : ''}</p>
-              <p><b>Học vị cao nhất:</b> {currentDegree?.degree || (edu.length === 0 ? r.academic_degree : null) || 'Chưa có văn bằng được xác minh'}{(currentDegree?.end_year || (edu.length === 0 ? r.degree_year : null)) ? ` (cấp năm ${currentDegree?.end_year || r.degree_year})` : ''}{(currentDegree?.country || (edu.length === 0 ? r.degree_country : null)) ? ` – ${currentDegree?.country || r.degree_country}` : ''}</p>
-            </section>
-          )}
           {edu.length > 0 && (
             <section className="cv-block"><h2>Quá trình đào tạo</h2>
               <div className="timeline">
                 {edu.map(i => (
                   <div className="tl-item" key={i.id}>
                     <b>{i.degree}{i.major ? ` – ${i.major}` : ''}</b>
-                    <span>{[i.institution, i.country, yearRange(i.start_year, i.end_year)].filter(Boolean).join(' • ')}</span>
-                    {i.thesis_title && <p>Luận văn/luận án: {i.thesis_title}</p>}
+                    <span>{[i.institution, yearRange(i.start_year, i.end_year)].filter(Boolean).join(' • ')}</span>
                   </div>
                 ))}
               </div>
@@ -202,6 +192,11 @@ export default function ResearcherProfile() {
               <dl>
                 <dt>Thỉnh giảng</dt><dd>{priv.available_guest_lecturing ? 'Sẵn sàng' : 'Chưa đăng ký'}</dd>
                 <dt>Tư vấn doanh nghiệp</dt><dd>{priv.available_business_consulting ? 'Sẵn sàng' : 'Chưa đăng ký'}</dd>
+                <dt>Hợp tác nghiên cứu</dt><dd>{priv.wants_research_collaboration ? 'Muốn tìm đồng đội nghiên cứu' : 'Chưa đăng ký'}</dd>
+                <dt>Tham gia hội đồng</dt><dd>{priv.available_committee_service ? 'Sẵn sàng' : 'Chưa đăng ký'}</dd>
+                <dt>Hướng dẫn nghiên cứu</dt><dd>{priv.available_supervision ? 'Sẵn sàng' : 'Chưa đăng ký'}</dd>
+                <dt>Năm công nhận PGS</dt><dd>{priv.associate_professor_year || '—'}</dd>
+                <dt>Năm công nhận GS</dt><dd>{priv.professor_year || '—'}</dd>
                 <dt>Ngày sinh</dt><dd>{priv.birth_date ? new Date(priv.birth_date).toLocaleDateString('vi-VN') : '—'}</dd>
                 <dt>Nơi sinh</dt><dd>{priv.birth_place || '—'}</dd>
                 <dt>Quê quán</dt><dd>{priv.hometown || '—'}</dd>

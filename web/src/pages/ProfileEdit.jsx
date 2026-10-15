@@ -415,6 +415,11 @@ export default function ProfileEdit() {
         available_guest_lecturing: pr?.available_guest_lecturing ?? false,
         guest_lecturing_subjects: Array.isArray(pr?.guest_lecturing_subjects) ? pr.guest_lecturing_subjects : [],
         available_business_consulting: pr?.available_business_consulting ?? false,
+        wants_research_collaboration: pr?.wants_research_collaboration ?? false,
+        available_committee_service: pr?.available_committee_service ?? false,
+        available_supervision: pr?.available_supervision ?? false,
+        associate_professor_year: pr?.associate_professor_year || (researcher.academic_title === 'Phó giáo sư' ? researcher.title_year : '') || '',
+        professor_year: pr?.professor_year || (researcher.academic_title === 'Giáo sư' ? researcher.title_year : '') || '',
       }))
   }, [researcher])
 
@@ -555,21 +560,26 @@ export default function ProfileEdit() {
       }
     }
 
-    const year = f.title_year === '' ? null : Number(f.title_year)
-    if (f.academic_title && (year == null || !Number.isInteger(year) || year < 1900 || year > new Date().getFullYear())) {
-      setMsg('Vui lòng nhập năm bổ nhiệm hợp lệ cho chức danh/học hàm đã chọn.'); return
+    // PGS và GS là hai mốc công nhận độc lập; cấp cao nhất ghi ở bảng researchers.
+    const currentYear = new Date().getFullYear()
+    const pgsYear = f.associate_professor_year === '' ? null : Number(f.associate_professor_year)
+    const gsYear = f.professor_year === '' ? null : Number(f.professor_year)
+    if ([pgsYear, gsYear].some(year => year !== null && (!Number.isInteger(year) || year < 1900 || year > currentYear))) {
+      setActiveTab('workplace'); setMsg('Năm công nhận Phó giáo sư/Giáo sư phải là năm hợp lệ.'); return
     }
-    if (year != null && !f.academic_title) {
-      setMsg('Có năm bổ nhiệm nhưng chưa chọn chức danh/học hàm.'); return
+    if (pgsYear != null && gsYear != null && gsYear < pgsYear) {
+      setActiveTab('workplace'); setMsg('Năm công nhận Giáo sư không thể trước năm công nhận Phó giáo sư.'); return
     }
+    const recognizedRank = gsYear != null ? 'Giáo sư' : (pgsYear != null ? 'Phó giáo sư' : '')
+    const recognizedYear = gsYear ?? pgsYear
     const proYear = f.professional_title_year === '' ? null : Number(f.professional_title_year)
     if (f.professional_title && (proYear == null || !Number.isInteger(proYear) || proYear < 1900 || proYear > new Date().getFullYear())) {
       setMsg('Vui lòng nhập năm bổ nhiệm hợp lệ cho chức danh nghề nghiệp.'); return
     }
     if (proYear != null && !f.professional_title) { setMsg('Có năm bổ nhiệm nhưng chưa chọn chức danh nghề nghiệp.'); return }
-    if (f.academic_title && !isAcademicRank(f.academic_title)) { setMsg('Học hàm chỉ gồm Phó giáo sư hoặc Giáo sư.'); return }
+
     const warnings = academicWarnings({ birthDate: f.birth_date, education: educationRows,
-      academicRank: f.academic_title, rankYear: f.title_year, professionalYear: proYear })
+      academicRank: recognizedRank, rankYear: recognizedYear, professionalYear: proYear })
     setEducationNotice(warnings)
     setSaving(true)
     const t = v => (String(v).trim() || null)
@@ -577,7 +587,7 @@ export default function ProfileEdit() {
       full_name: name,
       gender: t(f.gender), birth_year: birthYear, nationality: t(f.nationality),
       position: t(f.position),
-      academic_title: t(f.academic_title), title_year: num(f.title_year),
+      academic_title: t(recognizedRank), title_year: recognizedYear,
       professional_title: t(f.professional_title), professional_title_year: num(f.professional_title_year),
       academic_degree: t(degreeFromEducation?.degree || f.academic_degree), degree_year: num(degreeFromEducation?.end_year || f.degree_year), degree_country: t(degreeFromEducation?.country || f.degree_country),
       organization_id: f.organization_id === '' ? null : Number(f.organization_id),
@@ -596,6 +606,11 @@ export default function ProfileEdit() {
       available_guest_lecturing: Boolean(f.available_guest_lecturing) && guestEligible,
       guest_lecturing_subjects: guestSubjects,
       available_business_consulting: Boolean(f.available_business_consulting),
+      wants_research_collaboration: Boolean(f.wants_research_collaboration),
+      available_committee_service: Boolean(f.available_committee_service),
+      available_supervision: Boolean(f.available_supervision),
+      associate_professor_year: pgsYear,
+      professor_year: gsYear,
       birth_date: f.birth_date || null, birth_place: t(f.birth_place),
       hometown: t(f.hometown), ethnicity: t(f.ethnicity), address: t(f.address),
       phone: phone || null, phone_office: phoneO || null, phone_home: phoneH || null, fax: t(f.fax),
@@ -851,15 +866,13 @@ export default function ProfileEdit() {
             <label>Năm bổ nhiệm chức danh nghề nghiệp
               <input type="number" min="1900" max={new Date().getFullYear()} value={f.professional_title_year} onChange={set('professional_title_year')} />
             </label>
-            <label>Học hàm (chỉ PGS / GS, theo quyết định công nhận)
-              <select value={f.academic_title} onChange={set('academic_title')}>
-                <option value="">-- Chưa được công nhận / Không có --</option>
-                {ACADEMIC_RANKS.map(x => <option key={x}>{x}</option>)}
-              </select>
+            <label>Năm công nhận Phó giáo sư (nếu có)
+              <input type="number" min="1900" max={new Date().getFullYear()} value={f.associate_professor_year} onChange={set('associate_professor_year')} placeholder="Ví dụ: 2020" />
             </label>
-            <label>Năm công nhận học hàm
-              <input type="number" min="1900" max={new Date().getFullYear()} value={f.title_year} onChange={set('title_year')} />
+            <label>Năm công nhận Giáo sư (nếu có)
+              <input type="number" min="1900" max={new Date().getFullYear()} value={f.professor_year} onChange={set('professor_year')} placeholder="Ví dụ: 2025" />
             </label>
+            <p className="hint wide">Chỉ điền năm khi đã có quyết định công nhận học hàm tương ứng. Có thể ghi cả mốc PGS và GS; hệ thống tự hiển thị học hàm cao nhất trên hồ sơ.</p>
             <label>Học vị cao nhất (tự động)
               <input readOnly value={degreeFromEducation?.degree || f.academic_degree || 'Chưa khai báo'} />
             </label>
@@ -872,7 +885,7 @@ export default function ProfileEdit() {
             <p className="hint wide">Học hàm: chỉ Phó giáo sư/Giáo sư theo quyết định công nhận. Chức danh nghề nghiệp: giảng viên/nghiên cứu viên theo quyết định bổ nhiệm. Học vị: tự lấy từ quá trình đào tạo; không suy ra học hàm từ học vị. Những mốc thời gian bất thường chỉ được cảnh báo để đối chiếu giấy tờ.</p>
           </div>
           {academicWarnings({ birthDate: f.birth_date, education: educationRows,
-            academicRank: f.academic_title, rankYear: f.title_year,
+            academicRank: f.professor_year ? 'Giáo sư' : (f.associate_professor_year ? 'Phó giáo sư' : ''), rankYear: f.professor_year || f.associate_professor_year,
             professionalYear: f.professional_title_year }).map((note, i) => (
             <p className="hint" key={i} role="status" style={{ color: '#a16207' }}>⚠ {note}</p>
           ))}
@@ -984,8 +997,8 @@ export default function ProfileEdit() {
         render={i => ({ main: i.language, sub: i.level ? `Chứng chỉ / trình độ: ${i.level}` : '' })}
       />
 
-      <Collapse id="extras" title="VII. Hoạt động chuyên môn bổ sung" ctl={ctl}>
-          <p className="muted">Thông tin này hiển thị với chính bạn và quản trị viên để hỗ trợ kết nối chuyên môn.</p>
+      <Collapse id="extras" title="VII. Thỉnh giảng, tư vấn và hợp tác nghiên cứu" ctl={ctl}>
+          <p className="muted">Đăng ký thỉnh giảng, tư vấn doanh nghiệp và kết nối cộng sự nghiên cứu tại cùng một nơi. Chỉ công khai thông tin hợp tác khi bạn chủ động lựa chọn.</p>
           <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
             <div className="guest-lecture-box">
               <div className="guest-lecture-heading">
@@ -1033,6 +1046,24 @@ export default function ProfileEdit() {
                 style={{ width: 18, height: 18, flex: '0 0 18px' }} />
               Tôi sẵn sàng tư vấn doanh nghiệp
             </label>
+            <fieldset className="profile-collab-options">
+              <legend>Nhu cầu hợp tác và hoạt động học thuật</legend>
+              {[
+                ['wants_research_collaboration', 'Tôi muốn tìm cộng sự nghiên cứu', 'Cho phép người dùng đã đăng nhập tìm thấy hồ sơ học thuật công khai của bạn để hợp tác nghiên cứu.'],
+                ['available_committee_service', 'Đồng ý tham gia hội đồng', 'Sẵn sàng nhận lời mời hội đồng phù hợp chuyên môn.'],
+                ['available_supervision', 'Đồng ý làm người hướng dẫn', 'Sẵn sàng hướng dẫn học tập, nghiên cứu theo điều kiện của đơn vị.'],
+              ].map(([field, title, description]) => (
+                <label className="profile-collab-option" key={field}>
+                  <input type="checkbox" checked={Boolean(f[field])}
+                    onChange={e => setF(prev => ({ ...prev, [field]: e.target.checked }))} />
+                  <span><strong>{title}</strong><small>{description}</small></span>
+                </label>
+              ))}
+              <p className="hint">Đánh dấu thể hiện nguyện vọng hợp tác; không đồng nghĩa với việc được bổ nhiệm hoặc được giao nhiệm vụ chính thức.</p>
+              <Link to="/collaboration" className="btn btn-ghost" style={{ display: 'inline-flex', width: 'fit-content', marginTop: 10 }}>
+                Tìm cộng sự phù hợp →
+              </Link>
+            </fieldset>
           </div>
         </Collapse>
       </ProfileTabContext.Provider>
