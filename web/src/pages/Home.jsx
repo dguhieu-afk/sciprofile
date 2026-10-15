@@ -85,8 +85,8 @@ export default function Home() {
       <section className="hero">
         <div className="container">
           <span className="tag">Nền tảng lý lịch khoa học &amp; kho nghiên cứu mở</span>
-          <h1>Khám phá tri thức, kết nối nhà nghiên cứu</h1>
-          <p>Tìm kiếm công trình, xem hồ sơ khoa học và trích dẫn chỉ với vài cú nhấp chuột.</p>
+          <h1>Kho lưu trữ, liên kết CV và kết nối nhà nghiên cứu</h1>
+          <p>Tìm kiếm công trình, xem hồ sơ khoa học với vài cú nhấp chuột.</p>
           <form className="search" onSubmit={submit}>
             <Search size={20} style={{ alignSelf: 'center', marginLeft: 8, color: '#64748b' }} />
             <input
