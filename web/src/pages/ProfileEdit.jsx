@@ -16,7 +16,7 @@ const cleanPhone = s => String(s || '').replace(/[\s.\-]/g, '')
 const mobilePhoneOk = s => !s || /^0\d{9}$/.test(s)
 const phoneOk = s => !s || /^(0|\+84)\d{9,10}$/.test(s)
 
-// Gợi ý tỉnh/thành phố; người dùng vẫn có thể nhập địa danh khác.
+// Danh sách 34 tỉnh/thành hiện hành để chọn chính xác; không cho lưu chữ nhập dở.
 const vietnamProvinces = [
   'An Giang', 'Bắc Ninh', 'Cà Mau', 'Cao Bằng', 'Đắk Lắk', 'Điện Biên',
   'Đồng Nai', 'Đồng Tháp', 'Gia Lai', 'Hà Nội', 'Hà Tĩnh', 'Hải Phòng',
@@ -26,6 +26,83 @@ const vietnamProvinces = [
   'Thành phố Hồ Chí Minh', 'Thành phố Huế', 'Tuyên Quang', 'Vĩnh Long',
   'Thành phố Cần Thơ',
 ]
+
+// Gợi ý khi gõ nhưng chỉ chấp nhận địa danh đã chọn chính xác.
+const normalizeLocation = value => String(value || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+  .toLocaleLowerCase('vi').trim()
+
+function ProvinceAutocomplete({ label, value, onChange, items = vietnamProvinces }) {
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const search = normalizeLocation(value)
+  const results = !search ? items : items
+    .filter(name => normalizeLocation(name).includes(search))
+    .sort((a, b) => {
+      const ap = normalizeLocation(a).startsWith(search) ? 0 : 1
+      const bp = normalizeLocation(b).startsWith(search) ? 0 : 1
+      return ap - bp || a.localeCompare(b, 'vi')
+    })
+  const choices = results.slice(0, 8)
+  const valid = items.includes(String(value || '').trim())
+  const inputId = useRef(`province-${Math.random().toString(36).slice(2)}`).current
+  const pick = (name) => { onChange(name); setOpen(false); setActive(0) }
+
+  return (
+    <div className="province-autocomplete" style={{ position: 'relative', minWidth: 0 }}>
+      <label htmlFor={inputId} className="lock" style={{ display: 'block', marginBottom: 8 }}>
+        <Lock size={12} /> {label} *
+      </label>
+      <input
+        id={inputId}
+        type="text"
+        value={value || ''}
+        onChange={e => { onChange(e.target.value); setActive(0); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        autoComplete="off"
+        placeholder="Gõ tên tỉnh/thành, ví dụ: Lâm..."
+        role="combobox"
+        aria-expanded={open && choices.length > 0}
+        aria-controls={`${inputId}-list`}
+        aria-autocomplete="list"
+        aria-invalid={Boolean(value && !valid)}
+        onKeyDown={e => {
+          if (e.key === 'Escape') setOpen(false)
+          if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive(i => Math.min(i + 1, choices.length - 1)) }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setActive(i => Math.max(0, i - 1)) }
+          if (e.key === 'Enter' && open && choices.length) { e.preventDefault(); pick(choices[active] || choices[0]) }
+        }}
+        style={{ width: '100%' }}
+      />
+      {open && choices.length > 0 && (
+        <div id={`${inputId}-list`} role="listbox"
+          style={{ position: 'absolute', zIndex: 80, top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #d4deea', borderRadius: 12, boxShadow: '0 12px 28px rgba(10,30,60,.13)', maxHeight: 260, overflowY: 'auto', marginTop: 4 }}>
+          {choices.map((name, i) => (
+            <button type="button" key={name} role="option" aria-selected={active === i}
+              onMouseDown={e => e.preventDefault()} onClick={() => pick(name)}
+              style={{ display: 'block', width: '100%', textAlign: 'left', border: 0, background: active === i ? '#eef4ff' : '#fff', padding: '11px 14px', cursor: 'pointer', color: '#1e3152' }}>
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+      {value && !valid && <small role="alert" style={{ display: 'block', marginTop: 6, color: '#b45309' }}>
+        Hãy chọn đúng tỉnh/thành phố từ danh sách gợi ý; không lưu tên nhập dở.
+      </small>}
+      {open && !!search && !choices.length && <small style={{ display: 'block', marginTop: 6, color: '#b45309' }}>
+        Không tìm thấy địa danh trong danh sách. Hãy kiểm tra lại tên.
+      </small>}
+    </div>
+  )
+}
+
+// Đối chiếu địa danh trước khi ghi vào CSDL. Không dựa vào riêng HTML validation.
+const validProvince = value => vietnamProvinces.includes(String(value || '').trim())
+const validCivilDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) &&
+  !Number.isNaN(Date.parse(`${value}T00:00:00`)) &&
+  new Date(`${value}T00:00:00`).toISOString().slice(0, 10) === value
 
 // Danh mục gợi ý phổ biến, không phải danh sách chứng chỉ toàn cầu đầy đủ.
 // Người dùng luôn có thể nhập tên ngôn ngữ/chứng chỉ khác.
@@ -367,6 +444,25 @@ export default function ProfileEdit() {
            const name = liveCap(f.full_name.trim().replace(/\s+/g, ' '))
     if (name.length < 2) { setMsg('Họ tên không được để trống.'); return }
 
+    // Các trường lý lịch chính bắt buộc chọn đúng giá trị trong danh mục.
+    if (!['Nam', 'Nữ', 'Khác'].includes(f.gender)) {
+      setActiveTab('personal'); setMsg('Vui lòng chọn giới tính trong danh sách.'); return
+    }
+    if (!validCivilDate(f.birth_date)) {
+      setActiveTab('personal'); setMsg('Vui lòng nhập ngày sinh hợp lệ.'); return
+    }
+    if (!validProvince(f.birth_place)) {
+      setActiveTab('personal'); setMsg('Nơi sinh chưa hợp lệ. Hãy gõ để tìm và chọn đúng tỉnh/thành phố trong danh sách gợi ý.'); return
+    }
+    if (!validProvince(f.hometown)) {
+      setActiveTab('personal'); setMsg('Quê quán chưa hợp lệ. Hãy chọn đúng tỉnh/thành phố trong danh sách gợi ý.'); return
+    }
+    if (!f.ethnicity?.trim()) {
+      setActiveTab('personal'); setMsg('Vui lòng chọn dân tộc.'); return
+    }
+    if (!f.nationality?.trim()) {
+      setActiveTab('personal'); setMsg('Vui lòng nhập quốc tịch.'); return
+    }
     let birthYear = null
     if (f.birth_date) {
       const d = new Date(f.birth_date)
@@ -396,11 +492,23 @@ export default function ProfileEdit() {
       return
     }
 
+    if (citizenId && !f.citizen_id_issue_date) {
+      setActiveTab('personal'); setMsg('Đã nhập số CCCD thì cần nhập ngày cấp CCCD.'); return
+    }
+    if (citizenId && !String(f.citizen_id_issued_by || '').trim()) {
+      setActiveTab('personal'); setMsg('Vui lòng nhập cơ quan cấp CCCD.'); return
+    }
+    if (!citizenId && (f.citizen_id_issue_date || f.citizen_id_issued_by?.trim())) {
+      // Mặc định cơ quan cấp được điền sẵn: không tính là đã khai CCCD.
+      if (f.citizen_id_issue_date) {
+        setActiveTab('personal'); setMsg('Có ngày cấp nhưng chưa nhập số CCCD.'); return
+      }
+    }
     if (f.citizen_id_issue_date) {
       const issueDate = new Date(`${f.citizen_id_issue_date}T00:00:00`)
       const todayDate = new Date()
       todayDate.setHours(23, 59, 59, 999)
-      if (isNaN(issueDate.getTime()) || issueDate > todayDate) {
+      if (!validCivilDate(f.citizen_id_issue_date) || issueDate > todayDate || (f.birth_date && issueDate < new Date(`${f.birth_date}T00:00:00`))) {
         setMsg('Ngày cấp CCCD không hợp lệ.')
         return
       }
@@ -517,13 +625,13 @@ export default function ProfileEdit() {
               <input value={f.full_name} onChange={e => setF({ ...f, full_name: liveCap(e.target.value) })} placeholder="Nguyễn Văn A" />
             </label>
             <label className="profile-compact">Giới tính
-              <select value={f.gender} onChange={set('gender')}>
+              <select value={f.gender} onChange={set('gender')} required>
                 <option value="">-- Chọn --</option>
                 <option>Nam</option><option>Nữ</option><option>Khác</option>
               </select>
             </label>
             <label className="profile-compact"><span className="lock"><Lock size={12} /> Ngày sinh</span>
-              <input type="date" value={f.birth_date} max={today} onChange={set('birth_date')} />
+              <input type="date" value={f.birth_date} max={today} onChange={set('birth_date')} required />
             </label>
             <div className="profile-form-group-title"><span>02</span><div><strong>Giấy tờ định danh</strong><small>Thông tin chỉ hiển thị theo quyền truy cập</small></div></div>
             <label>
@@ -563,33 +671,18 @@ export default function ProfileEdit() {
               />
             </label>
             <div className="profile-form-group-title"><span>03</span><div><strong>Quê quán và liên hệ</strong><small>Địa chỉ, số điện thoại và email</small></div></div>
-            <label>
-              <span className="lock"><Lock size={12} /> Nơi sinh</span>
-              <input
-                list="vietnam-provinces"
-                value={f.birth_place}
-                onChange={setCap('birth_place')}
-                placeholder="Nhập tỉnh/thành phố"
-                autoComplete="off"
-              />
-            </label>
-            <label>
-              <span className="lock"><Lock size={12} /> Quê quán</span>
-              <input
-                list="vietnam-provinces"
-                value={f.hometown}
-                onChange={setCap('hometown')}
-                placeholder="Nhập tỉnh/thành phố"
-                autoComplete="off"
-              />
-            </label>
-            <datalist id="vietnam-provinces">
-              {vietnamProvinces.map(province => (
-                <option key={province} value={province} />
-              ))}
-            </datalist>
+            <ProvinceAutocomplete
+              label="Nơi sinh (tỉnh/thành phố)"
+              value={f.birth_place}
+              onChange={value => setF(prev => ({ ...prev, birth_place: value }))}
+            />
+            <ProvinceAutocomplete
+              label="Quê quán (tỉnh/thành phố)"
+              value={f.hometown}
+              onChange={value => setF(prev => ({ ...prev, hometown: value }))}
+            />
             <label><span className="lock"><Lock size={12} /> Dân tộc</span>
-              <select value={f.ethnicity} onChange={set('ethnicity')}>
+              <select value={f.ethnicity} onChange={set('ethnicity')} required>
                 <option value="">-- Chọn dân tộc --</option>
                 {['Kinh','Tày','Thái','Mường','Khmer','Hoa','Nùng','Mông','Dao','Gia Rai','Ê Đê','Ba Na','Sán Chay','Chăm','Cơ Ho','Xơ Đăng','Sán Dìu','Hrê','Ra Glai','Mnông','Thổ','Stiêng','Khơ Mú','Bru-Vân Kiều','Giáy','Cơ Tu','Gié-Triêng','Mạ','Kháng','Co','Tà Ôi','Chơ Ro','Xinh Mun','Hà Nhì','Chu Ru','Lào','La Chí','La Ha','Phù Lá','La Hủ','Lự','Lô Lô','Chứt','Mảng','Pà Thẻn','Cờ Lao','Bố Y','Cống','Si La','Pu Péo','Rơ Măm','Brâu','Ơ Đu'].map(x => <option key={x}>{x}</option>)}
               </select>
