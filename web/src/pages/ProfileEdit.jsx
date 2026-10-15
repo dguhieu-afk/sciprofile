@@ -143,46 +143,69 @@ export default function ProfileEdit() {
   const [ctl, setCtl] = useState({ open: false, n: 0 })
   const [addressSuggestions, setAddressSuggestions] = useState([])
   const [addressLoading, setAddressLoading] = useState(false)
+  const [addressError, setAddressError] = useState('')
+  const [addressFocused, setAddressFocused] = useState(false)
+  const [selectedPosition, setSelectedPosition] = useState(null)
+  const skipAddressSearchRef = useRef(false)
   const addressInputRef = useRef(null)
+  const geoapifyKey = import.meta.env.VITE_GEOAPIFY_API_KEY?.trim() || ''
 
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
 
-  // Gợi ý địa chỉ hành chính Việt Nam miễn phí, không cần API key.
-  // API gợi ý tỉnh/thành và phường/xã; không thay thế tìm số nhà/toạ độ như Google Maps.
+  // Geoapify Address Autocomplete: chỉ gọi khi người dùng đang nhập.
+  // Chờ 500ms và hủy yêu cầu trước để giảm lượt gọi API miễn phí.
   useEffect(() => {
+    if (skipAddressSearchRef.current) {
+      skipAddressSearchRef.current = false
+      return
+    }
     const query = String(f?.address || '').trim()
-    if (query.length < 2) {
+    if (!addressFocused || !geoapifyKey || query.length < 3) {
       setAddressSuggestions([])
       setAddressLoading(false)
+      setAddressError('')
       return
     }
 
-    let cancelled = false
+    const controller = new AbortController()
     const timer = setTimeout(async () => {
       setAddressLoading(true)
+      setAddressError('')
       try {
-        const url = `https://tinhthanhpho.com/api/v1/suggest?q=${encodeURIComponent(query)}&limit=6`
-        const response = await fetch(url, { headers: { Accept: 'application/json' } })
-        if (!response.ok) throw new Error('Không lấy được gợi ý địa chỉ')
+        const params = new URLSearchParams({
+          text: query,
+          format: 'json',
+          filter: 'countrycode:vn',
+          lang: 'vi',
+          limit: '6',
+          apiKey: geoapifyKey,
+        })
+        const response = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${params}`, { signal: controller.signal })
+        if (!response.ok) throw new Error(response.status === 403 ? 'API key không hợp lệ hoặc bị chặn theo tên miền.' : 'Không thể lấy gợi ý địa chỉ lúc này.')
         const payload = await response.json()
-        const rows = Array.isArray(payload) ? payload : (payload.data?.items || payload.items || payload.data || [])
-        const suggestions = rows.map(item => {
-          if (typeof item === 'string') return item
-          return item.label || item.display || item.full_name || item.name || ''
-        }).filter(Boolean).slice(0, 6)
-        if (!cancelled) setAddressSuggestions([...new Set(suggestions)])
-      } catch {
-        if (!cancelled) setAddressSuggestions([])
+        const rows = Array.isArray(payload?.results) ? payload.results : []
+        const seen = new Set()
+        const suggestions = rows.filter(item => {
+          const label = item.formatted || item.address_line1 || ''
+          if (!label || seen.has(label)) return false
+          seen.add(label)
+          return true
+        })
+        setAddressSuggestions(suggestions)
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          setAddressSuggestions([])
+          setAddressError(error.message || 'Không thể tìm địa chỉ.')
+        }
       } finally {
-        if (!cancelled) setAddressLoading(false)
+        if (!controller.signal.aborted) setAddressLoading(false)
       }
-    }, 300)
-
+    }, 500)
     return () => {
-      cancelled = true
       clearTimeout(timer)
+      controller.abort()
     }
-  }, [f?.address])
+  }, [f?.address, addressFocused, geoapifyKey])
 
   useEffect(() => {
     if (!researcher) return
@@ -476,29 +499,69 @@ export default function ProfileEdit() {
             <label>Quốc tịch
               <input value={f.nationality} onChange={setCap('nationality')} />
             </label>
-            <label className="wide"><span className="lock"><Lock size={12} /> Chỗ ở riêng hoặc địa chỉ liên lạc</span>
-              <input ref={addressInputRef} value={f.address} onChange={setCap('address')} placeholder="Nhập địa chỉ, phường/xã hoặc tỉnh/thành" autoComplete="off" aria-autocomplete="list" />
-              {addressLoading && <small style={{ color: '#64748b' }}>Đang tìm gợi ý địa chỉ…</small>}
-              {addressSuggestions.length > 0 && (
-                <div role="listbox" aria-label="Gợi ý địa chỉ" style={{ marginTop: 6, border: '1px solid #dbe3ef', borderRadius: 10, background: '#fff', boxShadow: '0 8px 20px rgba(15,23,42,.08)', overflow: 'hidden' }}>
-                  {addressSuggestions.map((suggestion, index) => (
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected="false"
-                      key={`${suggestion}-${index}`}
-                      onClick={() => {
-                        setF(prev => ({ ...prev, address: suggestion }))
-                        setAddressSuggestions([])
-                      }}
-                      style={{ display: 'block', width: '100%', padding: '10px 12px', textAlign: 'left', border: 0, borderBottom: index === addressSuggestions.length - 1 ? 0 : '1px solid #eef2f7', background: '#fff', cursor: 'pointer', color: '#1e293b' }}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
+            <label className="wide geo-address-label"><span className="lock"><Lock size={12} /> Chỗ ở riêng hoặc địa chỉ liên lạc</span>
+              <input
+                ref={addressInputRef}
+                value={f.address}
+                onChange={e => {
+                  const value = e.target.value
+                  setF(prev => ({ ...prev, address: value }))
+                  setSelectedPosition(null)
+                  setAddressFocused(true)
+                }}
+                onFocus={() => setAddressFocused(true)}
+                onBlur={() => setTimeout(() => setAddressFocused(false), 150)}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') { setAddressSuggestions([]); setAddressFocused(false) }
+                }}
+                placeholder="Ví dụ: 1 Võ Văn Ngân, Thủ Đức, TP. Hồ Chí Minh"
+                autoComplete="off"
+                aria-autocomplete="list"
+                aria-controls="geoapify-address-results"
+                aria-expanded={addressFocused && addressSuggestions.length > 0}
+              />
+              {geoapifyKey ? (
+                <>
+                  {addressLoading && addressFocused && <small className="geo-address-note">Đang tìm địa chỉ…</small>}
+                  {addressError && addressFocused && <small className="geo-address-warning">{addressError} Bạn vẫn có thể nhập tay.</small>}
+                  {addressFocused && addressSuggestions.length > 0 && (
+                    <div className="geo-address-results" role="listbox" id="geoapify-address-results" aria-label="Gợi ý địa chỉ Geoapify">
+                      {addressSuggestions.map((place, index) => (
+                        <button
+                          key={`${place.place_id || place.formatted}-${index}`}
+                          type="button"
+                          role="option"
+                          aria-selected="false"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            skipAddressSearchRef.current = true
+                            setF(prev => ({ ...prev, address: place.formatted || place.address_line1 }))
+                            setSelectedPosition(Number.isFinite(place.lat) && Number.isFinite(place.lon) ? { lat: place.lat, lon: place.lon } : null)
+                            setAddressSuggestions([])
+                            setAddressFocused(false)
+                            addressInputRef.current?.blur()
+                          }}
+                          className="geo-address-option"
+                        >
+                          <strong>{place.address_line1 || place.formatted}</strong>
+                          {place.address_line2 && <small>{place.address_line2}</small>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {selectedPosition && (
+                    <a
+                      className="geo-address-map"
+                      href={`https://www.openstreetmap.org/?mlat=${selectedPosition.lat}&mlon=${selectedPosition.lon}#map=17/${selectedPosition.lat}/${selectedPosition.lon}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >Xem vị trí đã chọn trên bản đồ ↗</a>
+                  )}
+                  <small className="geo-address-note">Gợi ý địa chỉ bởi Geoapify · Có thể nhập thủ công nếu thiếu số nhà hoặc ngõ/hẻm.</small>
+                </>
+              ) : (
+                <small className="geo-address-warning">Chưa cấu hình VITE_GEOAPIFY_API_KEY trong web/.env. Bạn vẫn có thể nhập địa chỉ thủ công.</small>
               )}
-              <small style={{ color: '#64748b' }}>Gợi ý miễn phí cho đơn vị hành chính Việt Nam; bạn vẫn có thể tự nhập số nhà và tên đường.</small>
             </label>
             <label><span className="lock"><Lock size={12} /> Điện thoại cơ quan (CQ)</span>
               <input type="tel" value={f.phone_office} onChange={set('phone_office')} placeholder="Ví dụ: 02812345678" />

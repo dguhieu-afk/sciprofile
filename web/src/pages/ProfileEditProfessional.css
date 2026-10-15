@@ -82,3 +82,14 @@
   .professional-profile .profile-action-save { min-width: 155px; }
   .professional-profile .profile-action-toolbar:not(:has(.profile-action-success, .profile-action-error)) { justify-content: flex-end; }
 }
+
+/* Geoapify address picker */
+.professional-profile .geo-address-label { position: relative; }
+.professional-profile .geo-address-results { position: relative; z-index: 12; width: 100%; overflow: hidden; border: 1px solid #cbdde5; border-radius: 12px; margin-top: 6px; background: #fff; box-shadow: 0 14px 26px rgba(18, 51, 74, .11); }
+.professional-profile .geo-address-option { display: flex; flex-direction: column; width: 100%; gap: 3px; text-align: left; padding: 12px 14px; cursor: pointer; border: 0; border-bottom: 1px solid #e9eff3; color: #193447; background: #fff; }
+.professional-profile .geo-address-option:last-child { border-bottom: 0; }
+.professional-profile .geo-address-option:hover, .professional-profile .geo-address-option:focus-visible { background: #eaf7f5; outline: 0; }
+.professional-profile .geo-address-option strong { font-size: 13px; font-weight: 700; }
+.professional-profile .geo-address-option small, .professional-profile .geo-address-note { font-size: 12px; color: #63788b; line-height: 1.5; }
+.professional-profile .geo-address-warning { display: block; color: #a54818; font-size: 12px; line-height: 1.5; }
+.professional-profile .geo-address-map { display: inline-block; margin: 8px 0 4px; font-size: 13px; font-weight: 600; color: #126b87; }
