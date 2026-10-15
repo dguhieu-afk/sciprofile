@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   GraduationCap, LogOut, ChevronDown, UserCircle, Eye, FolderOpen,
-  Heart, ShieldCheck, Flag,
+  Heart, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 
@@ -55,9 +55,8 @@ export default function Layout() {
                     <Link to="/favorites"><Heart size={16} /> Yêu thích</Link>
                     {isAdmin && (
                       <>
-                        <div className="menu-label">Quản trị</div>
-                        <Link to="/admin"><ShieldCheck size={16} /> Duyệt bài và người dùng</Link>
-                        <Link to="/admin/reports"><Flag size={16} /> Báo cáo vi phạm</Link>
+                        <div className="menu-label">DÀNH CHO QUẢN TRỊ VIÊN</div>
+                        <Link to="/admin"><ShieldCheck size={16} /> Trung tâm quản trị Admin</Link>
                       </>
                     )}
                     <div className="menu-sep" />

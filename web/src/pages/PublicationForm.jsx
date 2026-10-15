@@ -47,6 +47,7 @@ export default function PublicationForm() {
   const [doiMsg, setDoiMsg] = useState(null) // { ok, text }
   const [dupDoi, setDupDoi] = useState([])
   const [verifiedDoi, setVerifiedDoi] = useState('')
+  const autoPublishReady = !editing && Boolean(verifiedDoi) && extractDoi(f.doi)?.toLowerCase() === verifiedDoi
 
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
 
@@ -153,7 +154,7 @@ export default function PublicationForm() {
       setSuggTried(true)
       setAreaIds(prev => [...new Set([...prev, ...picked])])
       setVerifiedDoi(d.doi.trim().toLowerCase())
-      setDoiMsg({ ok: true, text: `Đã điền thông tin  (${d.authors.length} tác giả, ${d.citation_count} trích dẫn). ${picked.length ? `Đã gợi ý ${picked.length} lĩnh vực ở mục bên dưới, hãy kiểm tra lại.` : 'Chưa gợi ý được lĩnh vực, hãy tự chọn.'} Nhớ tải file trước khi gửi duyệt.` })
+      setDoiMsg({ ok: true, text: `Đã điền thông tin  (${d.authors.length} tác giả, ${d.citation_count} trích dẫn). ${picked.length ? `Đã gợi ý ${picked.length} lĩnh vực ở mục bên dưới, hãy kiểm tra lại.` : 'Chưa gợi ý được lĩnh vực, hãy tự chọn.'} Nếu dữ liệu DOI khớp, bài sẽ công khai ngay sau khi bạn bấm Xác minh & công khai.` })
     } catch (e) {
       setDoiMsg({ ok: false, text: e.message })
     }
@@ -189,8 +190,7 @@ export default function PublicationForm() {
     setErr('')
     // Chỉ công khai ngay khi DOI đã được tra cứu thành công ở phiên này.
     // Bài đang chỉnh sửa vẫn gửi duyệt lại để tránh sửa nội dung đã xác minh.
-    const isVerifiedDoi = !editing && verifiedDoi &&
-      extractDoi(f.doi)?.toLowerCase() === verifiedDoi
+    const isVerifiedDoi = autoPublishReady
     const status = requestedStatus // Trình duyệt không tự ghi APPROVED
     if (f.title.trim().length < 5) { setErr('Vui lòng nhập tiêu đề (ít nhất 5 ký tự).'); return }
     if (authors.length === 0) { setErr('Cần có ít nhất một tác giả.'); return }
@@ -199,8 +199,18 @@ export default function PublicationForm() {
     if (status === 'PENDING' || status === 'APPROVED') {
       if (areaIds.length === 0) { setErr('Hãy chọn ít nhất một lĩnh vực trước khi gửi duyệt.'); return }
     }
+    // Ngăn một tài khoản tạo lại cùng DOI, kể cả bài đã công khai hoặc đang chờ duyệt.
+    const normalizedDoi = extractDoi(f.doi)?.toLowerCase()
+    if (normalizedDoi && user?.id) {
+      const { data: ownDoi, error: doiReadError } = await supabase.from('publications')
+        .select('id,doi,title').eq('created_by', user.id).not('doi', 'is', null)
+      if (doiReadError) { setErr('Không kiểm tra được DOI trùng: ' + doiReadError.message); return }
+      const existing = (ownDoi || []).find(p => String(p.id) !== String(id || '') &&
+        extractDoi(p.doi)?.toLowerCase() === normalizedDoi)
+      if (existing) { setErr('Bạn đã đăng DOI này ở công trình "' + existing.title + '". Hãy sửa công trình cũ thay vì thêm mới.'); return }
+    }
     setBusy(true)
-    const t = v => (String(v).trim() || null)
+    const t = v => (String(v ?? '').trim() || null)
     const payload = {
       title: f.title.trim(), abstract: t(f.abstract), publication_type: f.publication_type,
       publication_year: year, journal: t(f.journal), volume: t(f.volume), issue: t(f.issue),
@@ -229,9 +239,10 @@ export default function PublicationForm() {
         setBusy(false)
         return
       }
-      await supabase.from('publication_authors').delete().eq('publication_id', id)
-      await supabase.from('publication_research_areas').delete().eq('publication_id', id)
-      await supabase.from('publication_keywords').delete().eq('publication_id', id)
+      for (const table of ['publication_authors', 'publication_research_areas', 'publication_keywords']) {
+        const { error: unlinkError } = await supabase.from(table).delete().eq('publication_id', id)
+        if (unlinkError) { setErr('Không cập nhật được liên kết ' + table + ': ' + unlinkError.message); setBusy(false); return }
+      }
     } else {
       const { data, error } = await supabase.from('publications')
         .insert({ ...payload, created_by: user.id }).select('id').single()
@@ -263,20 +274,22 @@ export default function PublicationForm() {
         if (attachError) { setErr('Lỗi gắn từ khóa: ' + attachError.message); setBusy(false); return }
       }
     }
-    // Máy chủ kiểm tra DOI và quyết định duyệt; thất bại thì bài vẫn ở PENDING.
+    // Gọi Edge Function ngay trong thao tác đăng bài: không phải chờ Admin xét duyệt.
+    // PENDING chỉ là trạng thái nội bộ tạm thời trước khi xác minh DOI phía máy chủ.
     if (status === 'PENDING' && isVerifiedDoi) {
       const { data: outcome, error: approvalError } = await supabase.functions.invoke('verify-publication-doi', {
         body: { publication_id: pid },
       })
       if (approvalError || !outcome?.approved) {
-        setErr('Đã lưu công trình ở trạng thái Chờ duyệt, nhưng chưa thể tự công khai DOI: ' +
-          (outcome?.error || approvalError?.message || 'Không xác minh được DOI.'))
+        setErr('Không thể công khai tự động. Công trình đã được lưu tạm ở trạng thái Chờ duyệt; nguyên nhân: ' +
+          (outcome?.error || approvalError?.message || 'DOI chưa xác minh thành công.') +
+          ' Bạn có thể kiểm tra lại DOI và dữ liệu bài báo, sau đó liên hệ quản trị viên nếu lỗi vẫn tiếp diễn.')
         setBusy(false)
         return
       }
     }
     setBusy(false)
-    navigate('/dashboard', { state: { submitted: status === 'PENDING' } })
+    navigate('/dashboard', { state: { submitted: status === 'PENDING' && !isVerifiedDoi, doiPublished: Boolean(isVerifiedDoi && status === 'PENDING') } })
   }
 
   if (!loaded) return <main className="container page"><div className="empty">Đang tải...</div></main>
@@ -285,7 +298,7 @@ export default function PublicationForm() {
     <main className="container page">
       <div className="page-head">
         <h1>{editing ? 'Sửa công trình' : 'Thêm công trình mới'}</h1>
-        <p>{editing ? 'Bạn có thể cập nhật thông tin công trình. Nếu sửa công trình đã công khai, bài sẽ chuyển sang chờ duyệt lại.' : 'Lưu nháp để làm tiếp sau, hoặc gửi duyệt để công trình xuất hiện trong kho công khai.'}</p>
+        <p>{editing ? 'Bạn có thể cập nhật thông tin công trình. Nếu sửa công trình đã công khai, bài sẽ chuyển sang chờ duyệt lại.' : 'Bài tra cứu DOI hợp lệ sẽ tự động công khai ngay sau khi xác minh trên máy chủ. Bài nhập thủ công cần Admin duyệt.'}</p>
       </div>
 
       {!editing && (
@@ -440,13 +453,13 @@ export default function PublicationForm() {
         </div>
 
         {err && <div className="auth-error" style={{ marginTop: 16 }}>{err}</div>}
-        <p className="hint" style={{ marginTop: 14 }}>Bài nhập mới có DOI được xác minh lại trên máy chủ sẽ tự công khai. Bài nhập thủ công hoặc bài chỉnh sửa sẽ gửi kiểm duyệt.</p>
+        <p className="hint" style={{ marginTop: 14 }}>DOI được tra cứu và xác minh thành công: công khai ngay, không cần Admin duyệt. Bài nhập thủ công vẫn gửi kiểm duyệt. Nếu bạn sửa tiêu đề, năm, loại bài hoặc DOI, hãy tra cứu lại.</p>
         <div className="form-actions">
           {!(editing && f.status === 'APPROVED') && (
             <button className="btn btn-ghost" disabled={busy} onClick={() => save('DRAFT')}>Lưu nháp</button>
           )}
           <button className="btn btn-primary" disabled={busy} onClick={() => save('PENDING')}>
-            {busy ? 'Đang lưu...' : (!editing && verifiedDoi && extractDoi(f.doi)?.toLowerCase() === verifiedDoi ? 'Công khai công trình' : 'Gửi kiểm duyệt')}
+            {busy ? (autoPublishReady ? 'Đang xác minh và công khai...' : 'Đang lưu...') : (autoPublishReady ? 'Xác minh & công khai ngay' : 'Gửi kiểm duyệt')}
           </button>
         </div>
       </div>
