@@ -75,6 +75,14 @@ export default function ResearcherProfile() {
     return Object.entries(m).sort((a, b) => a[0] - b[0])
   }, [pubs])
   const maxYear = Math.max(1, ...byYear.map(y => y[1]))
+  async function openUploadedCv() {
+    if (!priv?.uploaded_cv_path) return
+    const { data, error } = await supabase.storage.from('researcher-cvs')
+      .createSignedUrl(priv.uploaded_cv_path, 60)
+    if (error || !data?.signedUrl) { window.alert('Không mở được CV đính kèm: ' + (error?.message || 'Không có quyền')); return }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
+
   const cites = pubs.reduce((s, p) => s + p.citation_count, 0)
 
   if (loading) return <main className="container page"><div className="empty">Đang tải...</div></main>
@@ -101,6 +109,9 @@ export default function ResearcherProfile() {
         <div className="cv-actions no-print">
           <button className="btn btn-ghost" onClick={() => window.print()}><Printer size={16} /> In / Lưu PDF</button>
           {(isMe || isAdmin) && <ExportCvButton researcherId={r.id} />}
+          {(isMe || isAdmin) && priv?.uploaded_cv_path && <button type="button" className="btn btn-ghost" onClick={openUploadedCv}>
+            <FileText size={16} /> Xem CV đính kèm{priv.uploaded_cv_name ? ` (${priv.uploaded_cv_name})` : ''}
+          </button>}
           {isMe && <Link to="/profile/edit" className="btn btn-primary"><Pencil size={16} /> Chỉnh sửa</Link>}
         </div>
       </section>

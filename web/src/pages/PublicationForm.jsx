@@ -304,7 +304,7 @@ export default function PublicationForm() {
       {!editing && (
         <div className="form-card doi-card">
           <h2><Wand2 size={18} style={{ verticalAlign: '-3px' }} /> Nhập nhanh bằng DOI</h2>
-          <p className="hint">Dán DOI hoặc đường dẫn doi.org của bài báo, hệ thống tự điền thông tin  </p>
+          <p className="hint">Dán DOI hoặc đường dẫn doi.org để hệ thống tự động điền thông tin và xác minh trước khi công khai. Ví dụ: 10.1038/nature14539</p>
           <div className="inline" style={{ marginTop: 12 }}>
             <input value={doiInput} onChange={e => setDoiInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookup() } }}

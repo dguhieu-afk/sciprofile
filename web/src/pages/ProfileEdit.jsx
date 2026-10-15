@@ -7,6 +7,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import { liveCap, titleCase, capFirst } from '../utils'
 import ExportCvButton from '../components/ExportCvButton'
+import CvAttachmentUpload from '../components/CvAttachmentUpload'
 import { highestCompletedDegree, sortEducation, validateEducation, academicWarnings, ACADEMIC_RANKS, PROFESSIONAL_TITLES, isAcademicRank } from '../academicLogic'
 import './ProfileEditProfessional.css'
 import './GuestLecturingEligibility.css'
@@ -397,7 +398,7 @@ export default function ProfileEdit() {
         phone_office: pr?.phone_office || '',
         phone_home: pr?.phone_home || '',
         fax: pr?.fax || '',
-        contact_email: researcher.contact_email || '',
+        contact_email: user?.email || '',
         position: researcher.position || '',
         academic_title: isAcademicRank(researcher.academic_title) ? researcher.academic_title : '',
         title_year: isAcademicRank(researcher.academic_title) ? (researcher.title_year || '') : '',
@@ -421,7 +422,7 @@ export default function ProfileEdit() {
         associate_professor_year: pr?.associate_professor_year || (researcher.academic_title === 'Phó giáo sư' ? researcher.title_year : '') || '',
         professor_year: pr?.professor_year || (researcher.academic_title === 'Giáo sư' ? researcher.title_year : '') || '',
       }))
-  }, [researcher])
+  }, [researcher, user?.email])
 
   useEffect(() => {
     supabase.from('organizations').select('id,name').order('id').then(({ data }) => setOrgs(data || []))
@@ -591,7 +592,7 @@ export default function ProfileEdit() {
       professional_title: t(f.professional_title), professional_title_year: num(f.professional_title_year),
       academic_degree: t(degreeFromEducation?.degree || f.academic_degree), degree_year: num(degreeFromEducation?.end_year || f.degree_year), degree_country: t(degreeFromEducation?.country || f.degree_country),
       organization_id: f.organization_id === '' ? null : Number(f.organization_id),
-      contact_email: t(f.contact_email), orcid: t(f.orcid),
+      contact_email: user.email, orcid: t(f.orcid),
       google_scholar_url: t(f.google_scholar_url), website: t(f.website),
       research_interests: t(f.research_interests),
       bio: t(f.bio), updated_at: new Date().toISOString(),
@@ -676,6 +677,7 @@ export default function ProfileEdit() {
       <form id="profile-main-form" onSubmit={save} className="profile-main-form">
         <Collapse id="personal" title="I. Lý lịch sơ lược" defaultOpen ctl={ctl}>
                     <AvatarUpload researcher={researcher} userId={user.id} onDone={reload} />
+          <CvAttachmentUpload researcherId={researcher.id} userId={user.id} />
           <div className="form-grid profile-fields">
             <div className="profile-form-group-title"><span>01</span><div><strong>Thông tin cá nhân</strong><small>Họ tên, giới tính và ngày sinh</small></div></div>
             <label className="wide profile-name">Họ và tên *
@@ -840,7 +842,8 @@ export default function ProfileEdit() {
               <input value={f.fax} onChange={set('fax')} />
             </label>
             <label>Email liên hệ (công khai)
-              <input type="email" value={f.contact_email} onChange={set('contact_email')} />
+              <input type="email" value={user?.email || ''} readOnly aria-readonly="true" title="Email liên hệ đồng bộ từ tài khoản đăng nhập" />
+              <small style={{ display: 'block', color: '#64748b', marginTop: 5 }}>Email này được đồng bộ từ tài khoản đăng nhập và không chỉnh sửa tại hồ sơ.</small>
             </label>
           </div>
         </Collapse>
@@ -858,10 +861,18 @@ export default function ProfileEdit() {
               <input value={f.position} onChange={setCap('position')} placeholder="Trưởng bộ môn" />
             </label>
             <label>Chức danh nghề nghiệp (theo quyết định bổ nhiệm)
-              <select value={f.professional_title} onChange={set('professional_title')}>
-                <option value="">-- Chưa khai báo --</option>
-                {PROFESSIONAL_TITLES.map(x => <option key={x}>{x}</option>)}
-              </select>
+              <input
+                type="text"
+                list="professional-title-suggestions"
+                value={f.professional_title || ''}
+                onChange={set('professional_title')}
+                placeholder="Ví dụ: Giảng viên, Nghiên cứu viên..."
+                autoComplete="off"
+                maxLength={120}
+              />
+              <datalist id="professional-title-suggestions">
+                {PROFESSIONAL_TITLES.map(x => <option key={x} value={x} />)}
+              </datalist>
             </label>
             <label>Năm bổ nhiệm chức danh nghề nghiệp
               <input type="number" min="1900" max={new Date().getFullYear()} value={f.professional_title_year} onChange={set('professional_title_year')} />
