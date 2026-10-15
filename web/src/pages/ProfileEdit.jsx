@@ -763,7 +763,7 @@ export default function ProfileEdit() {
           { key: 'start_year', label: 'Năm bắt đầu', type: 'number' },
           { key: 'end_year', label: 'Năm hoàn thành', type: 'number' },
           { key: 'level', label: 'Đề tài cấp', type: 'select', options: ['Nhà nước', 'Bộ', 'Ngành', 'Tỉnh/Thành phố', 'Trường', 'Cơ sở', 'Khác'] },
-          { key: 'role', label: 'Trách nhiệm tham gia', type: 'select', options: ['Chủ nhiệm', 'Phó chủ nhiệm', 'Thư ký', 'Thành viên chính', 'Thành viên'] },
+          { key: 'role', label: 'Trách nhiệm tham gia', type: 'select', options: ['Chủ nhiệm' , 'Thư ký', 'Thành viên'] },
         ]}
         render={i => ({
           main: i.title,
