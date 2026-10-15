@@ -1,6 +1,6 @@
 import { useUI } from '../ui'
 import AvatarUpload from '../components/AvatarUpload'
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Eye, Lock, ChevronDown, Save } from 'lucide-react'
 import { supabase } from '../supabase'
@@ -27,23 +27,53 @@ const vietnamProvinces = [
   'Thành phố Cần Thơ',
 ]
 
-// Mục có thể bung ra / thu lại
-function Collapse({ title, count, defaultOpen = false, ctl, children }) {
-  const [open, setOpen] = useState(defaultOpen)
-  useEffect(() => { if (ctl && ctl.n > 0) setOpen(ctl.open) }, [ctl])
+// Các mục hồ sơ chia thành tab ngang. Không unmount form để tránh mất dữ liệu đang nhập.
+const ProfileTabContext = createContext(null)
+
+const PROFILE_TABS = [
+  { id: 'personal', label: 'Lý lịch sơ lược', number: '01' },
+  { id: 'workplace', label: 'Đơn vị & học hàm', number: '02' },
+  { id: 'identity', label: 'Định danh khoa học', number: '03' },
+  { id: 'education', label: 'Quá trình đào tạo', number: '04' },
+  { id: 'experience', label: 'Quá trình công tác', number: '05' },
+  { id: 'projects', label: 'Đề tài nghiên cứu', number: '06' },
+  { id: 'awards', label: 'Khen thưởng', number: '07' },
+  { id: 'languages', label: 'Ngoại ngữ', number: '08' },
+  { id: 'extras', label: 'Hoạt động bổ sung', number: '09' },
+]
+
+function Collapse({ id, title, count, defaultOpen = false, ctl, children }) {
+  const activeTab = useContext(ProfileTabContext)
+  const tabbed = activeTab !== null
+  const [localOpen, setLocalOpen] = useState(defaultOpen)
+  useEffect(() => { if (!tabbed && ctl && ctl.n > 0) setLocalOpen(ctl.open) }, [ctl, tabbed])
+  const open = tabbed ? activeTab === id : localOpen
   return (
-    <section className={`form-card acc profile-section ${open ? 'open' : ''}`}>
-      <button type="button" className="acc-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="acc-title">{title}</span>
-        {count != null && <em className="acc-count">{count}</em>}
-        <ChevronDown size={20} className="acc-chev" />
-      </button>
+    <section
+      id={id ? `profile-panel-${id}` : undefined}
+      role={tabbed ? 'tabpanel' : undefined}
+      aria-labelledby={tabbed && id ? `profile-tab-${id}` : undefined}
+      className={`form-card acc profile-section ${open ? 'open' : ''} ${tabbed ? 'profile-tab-panel' : ''}`}
+      hidden={!open}
+    >
+      {tabbed ? (
+        <div className="profile-panel-title">
+          <h2>{title}</h2>
+          {count != null && <span className="profile-panel-count">{count} mục đã lưu</span>}
+        </div>
+      ) : (
+        <button type="button" className="acc-head" onClick={() => setLocalOpen(!localOpen)} aria-expanded={localOpen}>
+          <span className="acc-title">{title}</span>
+          {count != null && <em className="acc-count">{count}</em>}
+          <ChevronDown size={20} className="acc-chev" />
+        </button>
+      )}
       <div className="acc-body" hidden={!open}>{children}</div>
     </section>
   )
 }
 
-function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ctl, onItemsChanged, validateCandidate, sortItems }) {
+function ItemSection({ id, title, hint, table, rid, fields, orderBy, asc, render, ctl, onItemsChanged, validateCandidate, sortItems }) {
   const blank = Object.fromEntries(fields.map(f => [f.key, '']))
   const [items, setItems] = useState([])
   const [draft, setDraft] = useState(blank)
@@ -85,7 +115,7 @@ function ItemSection({ title, hint, table, rid, fields, orderBy, asc, render, ct
   }
 
   return (
-    <Collapse title={title} count={items.length} ctl={ctl}>
+    <Collapse id={id} title={title} count={items.length} ctl={ctl}>
       {hint && <p className="hint">{hint}</p>}
       <div className="item-list">
         {items.length === 0 && <div className="item-empty">Chưa có mục nào.</div>}
@@ -141,6 +171,7 @@ export default function ProfileEdit() {
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
   const [ctl, setCtl] = useState({ open: false, n: 0 })
+  const [activeTab, setActiveTab] = useState('personal')
   const [addressSuggestions, setAddressSuggestions] = useState([])
   const [addressLoading, setAddressLoading] = useState(false)
   const [addressError, setAddressError] = useState('')
@@ -385,12 +416,6 @@ export default function ProfileEdit() {
         </div>
       </div>
 
-      <div className="profile-overview" aria-label="Hướng dẫn hoàn thiện hồ sơ">
-        <div className="profile-overview-item"><span className="profile-step-num">01</span><div><strong>Thông tin cơ bản</strong><small>Cá nhân, định danh và liên hệ</small></div></div>
-        <div className="profile-overview-item"><span className="profile-step-num">02</span><div><strong>Học thuật</strong><small>Học hàm, học vị và đào tạo</small></div></div>
-        <div className="profile-overview-item"><span className="profile-step-num">03</span><div><strong>CV khoa học</strong><small>Công tác, đề tài và giải thưởng</small></div></div>
-      </div>
-
       {/* Thanh thao tác bám ngay dưới thanh điều hướng khi cuộn trang. */}
       <div className="profile-action-toolbar" aria-label="Thao tác hồ sơ">
         <div className="profile-action-context" aria-live="polite">
@@ -405,13 +430,31 @@ export default function ProfileEdit() {
         </button>
       </div>
 
-      <div className="acc-tools">
-        <button type="button" className="link-btn" onClick={() => setCtl(c => ({ open: true, n: c.n + 1 }))}>Mở tất cả</button>
-        <button type="button" className="link-btn" onClick={() => setCtl(c => ({ open: false, n: c.n + 1 }))}>Thu gọn tất cả</button>
-      </div>
+      {/* Chỉ một mục mở tại mỗi thời điểm. Trên điện thoại vuốt ngang để đổi mục. */}
+      <nav className="profile-tab-strip" aria-label="Các nhóm thông tin hồ sơ">
+        <div className="profile-tab-list" role="tablist" aria-label="Mục hồ sơ">
+          {PROFILE_TABS.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              id={`profile-tab-${tab.id}`}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`profile-panel-${tab.id}`}
+              className={`profile-tab-button ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="profile-tab-number">{tab.number}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        <p className="profile-tab-hint">Chọn từng mục để chỉnh sửa. Nội dung đã nhập được giữ lại khi chuyển mục.</p>
+      </nav>
 
+      <ProfileTabContext.Provider value={activeTab}>
       <form id="profile-main-form" onSubmit={save} className="profile-main-form">
-        <Collapse title="I. Lý lịch sơ lược" defaultOpen ctl={ctl}>
+        <Collapse id="personal" title="I. Lý lịch sơ lược" defaultOpen ctl={ctl}>
                     <AvatarUpload researcher={researcher} userId={user.id} onDone={reload} />
           <div className="form-grid profile-fields">
             <div className="profile-form-group-title"><span>01</span><div><strong>Thông tin cá nhân</strong><small>Họ tên, giới tính và ngày sinh</small></div></div>
@@ -525,7 +568,7 @@ export default function ProfileEdit() {
                   {addressLoading && addressFocused && <small className="geo-address-note">Đang tìm địa chỉ…</small>}
                   {addressError && addressFocused && <small className="geo-address-warning">{addressError} Bạn vẫn có thể nhập tay.</small>}
                   {addressFocused && addressSuggestions.length > 0 && (
-                    <div className="geo-address-results" role="listbox" id="geoapify-address-results" aria-label="Gợi ý địa chỉ">
+                    <div className="geo-address-results" role="listbox" id="geoapify-address-results" aria-label="Gợi ý địa chỉ Geoapify">
                       {addressSuggestions.map((place, index) => (
                         <button
                           key={`${place.place_id || place.formatted}-${index}`}
@@ -597,7 +640,7 @@ export default function ProfileEdit() {
           </div>
         </Collapse>
 
-        <Collapse title="Đơn vị, chức vụ, học hàm, học vị" ctl={ctl}>
+        <Collapse id="workplace" title="Đơn vị, chức vụ, học hàm, học vị" ctl={ctl}>
           <p className="profile-section-intro">Thông tin chuyên môn phục vụ giới thiệu nhà khoa học và CV. Học vị cao nhất đồng bộ từ quá trình đào tạo đã khai báo.</p>
           <div className="form-grid profile-fields">
             <label>Đơn vị công tác
@@ -645,7 +688,7 @@ export default function ProfileEdit() {
           ))}
         </Collapse>
 
-        <Collapse title="Định danh khoa học và giới thiệu" ctl={ctl}>
+        <Collapse id="identity" title="Định danh khoa học và giới thiệu" ctl={ctl}>
           <p className="profile-section-intro">Các đường dẫn học thuật giúp người xem tìm được công bố và thông tin nghiên cứu của bạn.</p>
           <div className="form-grid profile-fields">
             <label>ORCID
@@ -672,6 +715,7 @@ export default function ProfileEdit() {
       <ItemSection ctl={ctl}
         onItemsChanged={syncEducationDegree}
         validateCandidate={validateEducation} sortItems={sortEducation}
+        id="education"
         title="II. Quá trình đào tạo"
         hint="Nhập theo quá trình thực tế. Năm bắt đầu không sau năm kết thúc; bậc cao hơn không được có năm cấp bằng sớm hơn bậc thấp hơn. Thực tập sau tiến sĩ không phải học vị. Danh sách và CV sẽ xếp từ cũ đến mới."
         table="researcher_education" rid={researcher.id} orderBy="end_year"
@@ -693,6 +737,7 @@ export default function ProfileEdit() {
       />
 
       <ItemSection ctl={ctl}
+        id="experience"
         title="III. Quá trình công tác chuyên môn" hint="Để trống 'Đến năm' nếu bạn vẫn đang làm việc ở đó."
         table="researcher_experience" rid={researcher.id} orderBy="start_year"
         fields={[
@@ -710,6 +755,7 @@ export default function ProfileEdit() {
       />
 
       <ItemSection ctl={ctl}
+        id="projects"
         title="IV. Đề tài nghiên cứu khoa học đã và đang tham gia"
         table="researcher_projects" rid={researcher.id} orderBy="start_year"
         fields={[
@@ -726,6 +772,7 @@ export default function ProfileEdit() {
       />
 
       <ItemSection ctl={ctl}
+        id="awards"
         title="V. Khen thưởng và giải thưởng"
         table="researcher_awards" rid={researcher.id} orderBy="year"
         fields={[
@@ -737,6 +784,7 @@ export default function ProfileEdit() {
       />
 
       <ItemSection ctl={ctl}
+        id="languages"
         title="VI. Ngoại ngữ" table="researcher_languages" rid={researcher.id} orderBy="id" asc
         fields={[
           { key: 'language', label: 'Ngoại ngữ *', placeholder: 'Tiếng Anh' },
@@ -745,7 +793,7 @@ export default function ProfileEdit() {
         render={i => ({ main: i.language, sub: i.level ? `Mức độ sử dụng: ${i.level}` : '' })}
       />
 
-      <Collapse title="VII. Hoạt động chuyên môn bổ sung" ctl={ctl}>
+      <Collapse id="extras" title="VII. Hoạt động chuyên môn bổ sung" ctl={ctl}>
           <p className="muted">Thông tin này hiển thị với chính bạn và quản trị viên để hỗ trợ kết nối chuyên môn.</p>
           <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
             <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -762,7 +810,7 @@ export default function ProfileEdit() {
             </label>
           </div>
         </Collapse>
-
+      </ProfileTabContext.Provider>
 
         <p className="hint profile-save-note">
           <strong>Lưu ý:</strong> Nút “Lưu thông tin” ở góc trên bên phải lưu thông tin cá nhân, học hàm, học vị và lựa chọn chuyên môn.

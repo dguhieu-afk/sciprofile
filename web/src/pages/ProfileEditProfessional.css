@@ -8,12 +8,6 @@
 .professional-profile .profile-hero .actions { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
 .professional-profile .profile-hero .btn { border: 1px solid #d8f5ee; background: white; color: #07594f; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .professional-profile .profile-hero .btn:hover { background: #e7faf5; }
-.professional-profile .profile-overview { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid var(--profile-border); border-radius: 18px; background: #fff; overflow: hidden; box-shadow: 0 5px 20px rgba(14,42,52,.035); }
-.professional-profile .profile-overview-item { display: flex; gap: 13px; padding: 18px 20px; align-items: center; }
-.professional-profile .profile-overview-item + .profile-overview-item { border-left: 1px solid #edf2f2; }
-.professional-profile .profile-step-num { display: grid; place-items: center; width: 37px; height: 37px; flex: 0 0 37px; border-radius: 11px; background: #e3f4f0; color: #08766e; font-weight: 750; font-size: 13px; }
-.professional-profile .profile-overview-item strong { display: block; font-size: 14px; color: var(--profile-ink); }
-.professional-profile .profile-overview-item small { display: block; font-size: 12px; color: #627789; margin-top: 3px; }
 .professional-profile .acc-tools { margin-top: 18px; margin-bottom: 12px; }
 .professional-profile .acc-tools button { font-weight: 650; }
 .professional-profile .profile-section { border-radius: 17px; border: 1px solid var(--profile-border); background: white; box-shadow: 0 4px 18px rgba(22,64,70,.045); margin-top: 13px; }
@@ -46,7 +40,7 @@
 .professional-profile .profile-save-bar .btn { padding: 12px 22px; }
 .professional-profile .profile-save-bar .hint { font-size: 12px; }
 @media (max-width: 1050px) { .professional-profile .profile-hero { align-items: flex-start; } .professional-profile .profile-fields, .professional-profile .add-form .form-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-@media (max-width: 700px) { .professional-profile .profile-hero { padding: 25px 20px; } .professional-profile .profile-hero .actions { width: 100%; margin-top: 18px; } .professional-profile .profile-overview { grid-template-columns: 1fr; } .professional-profile .profile-overview-item { padding: 12px 16px; } .professional-profile .profile-overview-item + .profile-overview-item { border-left: 0; border-top: 1px solid #edf2f2; } .professional-profile .profile-fields, .professional-profile .add-form .form-grid { grid-template-columns: minmax(0,1fr); gap: 16px; } .professional-profile .profile-fields > .profile-compact { max-width: none; } .professional-profile .profile-section .acc-head { padding: 17px; font-size: 16px; } .professional-profile .profile-section .acc-body { padding: 19px 17px 23px; } .professional-profile .profile-save-bar { bottom: 8px; } .professional-profile .profile-save-bar .btn { width: 100%; } }
+@media (max-width: 700px) { .professional-profile .profile-hero { padding: 25px 20px; } .professional-profile .profile-hero .actions { width: 100%; margin-top: 18px; } .professional-profile .profile-fields, .professional-profile .add-form .form-grid { grid-template-columns: minmax(0,1fr); gap: 16px; } .professional-profile .profile-fields > .profile-compact { max-width: none; } .professional-profile .profile-section .acc-head { padding: 17px; font-size: 16px; } .professional-profile .profile-section .acc-body { padding: 19px 17px 23px; } .professional-profile .profile-save-bar { bottom: 8px; } .professional-profile .profile-save-bar .btn { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .professional-profile * { transition: none !important; } }
 
 /* Thanh lưu ở góc phải: luôn sẵn sàng khi cuộn, không che nội dung. */
@@ -93,3 +87,77 @@
 .professional-profile .geo-address-option small, .professional-profile .geo-address-note { font-size: 12px; color: #63788b; line-height: 1.5; }
 .professional-profile .geo-address-warning { display: block; color: #a54818; font-size: 12px; line-height: 1.5; }
 .professional-profile .geo-address-map { display: inline-block; margin: 8px 0 4px; font-size: 13px; font-weight: 600; color: #126b87; }
+
+/* --------------------------------------------------------------
+   TAB HỒ SƠ NẰM NGANG – CHỈ HIỂN THỊ MỤC ĐANG CHỌN
+   -------------------------------------------------------------- */
+.professional-profile .profile-tab-strip { margin: 18px 0 16px; }
+.professional-profile .profile-tab-list {
+  display: flex;
+  align-items: stretch;
+  gap: 9px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 5px 2px 11px;
+  scrollbar-width: thin;
+  scrollbar-color: #b4c7d5 transparent;
+  scroll-snap-type: x proximity;
+}
+.professional-profile .profile-tab-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  min-height: 48px;
+  white-space: nowrap;
+  padding: 11px 16px;
+  border: 1px solid #d4e1e8;
+  border-radius: 12px;
+  background: white;
+  color: #24475d;
+  font: 650 13px/1.4 Inter, system-ui, sans-serif;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: background .15s, border-color .15s, box-shadow .15s;
+}
+.professional-profile .profile-tab-number {
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: #eaf3f5;
+  color: #32727d;
+  font-size: 11px;
+  font-weight: 800;
+}
+.professional-profile .profile-tab-button:hover { background: #f0f8fb; border-color: #a0c5d0; }
+.professional-profile .profile-tab-button.active {
+  background: #214cc6;
+  border-color: #214cc6;
+  color: white;
+  box-shadow: 0 5px 14px rgba(33,76,198,.18);
+}
+.professional-profile .profile-tab-button.active .profile-tab-number { background: rgba(255,255,255,.19); color: #fff; }
+.professional-profile .profile-tab-button:focus-visible { outline: 3px solid #7ab8fb; outline-offset: 3px; }
+.professional-profile .profile-tab-hint { margin: 0 3px 14px; color: #637b8c; font-size: 12px; }
+.professional-profile .profile-tab-panel { margin-top: 0; overflow: hidden; }
+.professional-profile .profile-tab-panel[hidden] { display: none !important; }
+.professional-profile .profile-tab-panel .profile-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 26px 0;
+}
+.professional-profile .profile-tab-panel .profile-panel-title h2 {
+  margin: 0;
+  font: 750 clamp(18px,2vw,23px)/1.4 Inter, system-ui, sans-serif;
+  color: #1b3853;
+}
+.professional-profile .profile-panel-count { font-size: 12px; color: #426f7d; background: #eaf6f4; border-radius: 16px; padding: 5px 11px; }
+.professional-profile .profile-tab-panel .acc-body { padding-top: 18px; }
+@media (max-width: 700px) {
+  .professional-profile .profile-tab-button { padding: 10px 13px; min-height: 44px; }
+  .professional-profile .profile-tab-panel .profile-panel-title { padding: 18px 17px 0; }
+  .professional-profile .profile-tab-hint { font-size: 11px; }
+}
