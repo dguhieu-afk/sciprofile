@@ -121,7 +121,7 @@ export default function Dashboard() {
       </section>
 
       <div className="row-between" style={{ margin: '24px 0 12px', gap: 12, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>{sourceFilter === 'DOI' ? 'Công trình có DOI' : 'Công trình không có DOI'} ({visibleItems.length})</h2>
+        <h2 style={{ margin: 0 }}>{sourceFilter === 'DOI' ? 'Công trình mã DOI' : 'Công trình thủ công'} ({visibleItems.length})</h2>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           Năm công bố
           <select aria-label="Lọc theo năm công bố" value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
@@ -137,7 +137,7 @@ export default function Dashboard() {
         )}
         {!loading && items.length > 0 && visibleItems.length === 0 && (
           <div className="empty">{yearFilter === 'ALL'
-            ? (sourceFilter === 'DOI' ? 'Bạn chưa có công trình nào có DOI.' : 'Bạn chưa có công trình đăng thủ công không có DOI.')
+            ? (sourceFilter === 'DOI' ? 'Bạn chưa có công trình mã DOI.' : 'Bạn chưa có công trình đăng thủ công.')
             : 'Không có công trình thuộc nhóm này trong năm được chọn.'}</div>
         )}
         {visibleItems.map(p => (
