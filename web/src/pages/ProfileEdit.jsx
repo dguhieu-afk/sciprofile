@@ -9,6 +9,7 @@ import { liveCap, titleCase, capFirst } from '../utils'
 import ExportCvButton from '../components/ExportCvButton'
 import { highestCompletedDegree, sortEducation, validateEducation, academicWarnings, ACADEMIC_RANKS, PROFESSIONAL_TITLES, isAcademicRank } from '../academicLogic'
 import './ProfileEditProfessional.css'
+import './GuestLecturingEligibility.css'
 
 const yearRange = (a, b) => (a ? `${a} – ${b || 'nay'}` : '')
 const num = v => (v === '' || v == null ? null : parseInt(v, 10))
@@ -307,6 +308,8 @@ export default function ProfileEdit() {
   const [educationNotice, setEducationNotice] = useState([])
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showGuestEligibility, setShowGuestEligibility] = useState(false)
+  const [guestSubjectDraft, setGuestSubjectDraft] = useState('')
   const [ctl, setCtl] = useState({ open: false, n: 0 })
   const [activeTab, setActiveTab] = useState('personal')
   const [addressSuggestions, setAddressSuggestions] = useState([])
@@ -410,6 +413,7 @@ export default function ProfileEdit() {
         research_interests: researcher.research_interests || '',
         bio: researcher.bio || '',
         available_guest_lecturing: pr?.available_guest_lecturing ?? false,
+        guest_lecturing_subjects: Array.isArray(pr?.guest_lecturing_subjects) ? pr.guest_lecturing_subjects : [],
         available_business_consulting: pr?.available_business_consulting ?? false,
       }))
   }, [researcher])
@@ -442,10 +446,42 @@ export default function ProfileEdit() {
   const setCap = k => e => setF({ ...f, [k]: liveCap(e.target.value) })
   const setFirst = k => e => setF({ ...f, [k]: capFirst(e.target.value) })
   const today = new Date().toISOString().slice(0, 10)
+  // Mỗi tiêu chí lấy từ dữ liệu hồ sơ thực tế, không dựa vào học vị tự gõ.
+  const guestSubjects = Array.isArray(f.guest_lecturing_subjects) ? f.guest_lecturing_subjects : []
+  const completedDegree = highestCompletedDegree(educationRows)
+  const acceptedDegrees = ['Thạc sĩ', 'Tiến sĩ', 'Tiến sĩ khoa học']
+  const guestConditions = [
+    { id: 'name', label: 'Họ và tên', detail: 'Đã khai báo họ tên đầy đủ', valid: String(f.full_name || '').trim().length >= 2, tab: 'personal' },
+    { id: 'org', label: 'Đơn vị công tác', detail: 'Đã chọn đơn vị công tác trong hồ sơ', valid: Boolean(f.organization_id), tab: 'workplace' },
+    { id: 'subjects', label: 'Ít nhất 1 môn giảng dạy', detail: 'Có tối thiểu một môn/chuyên đề có thể đảm nhận', valid: guestSubjects.length > 0, tab: 'extras' },
+    { id: 'degree', label: 'Học vị từ Thạc sĩ trở lên', detail: 'Có bằng tốt nghiệp Thạc sĩ/Tiến sĩ trong quá trình đào tạo', valid: acceptedDegrees.includes(completedDegree?.degree), tab: 'education' },
+  ]
+  const guestEligible = guestConditions.every(c => c.valid)
+  const guestMissing = guestConditions.filter(c => !c.valid).length
+  function addGuestSubject() {
+    const value = guestSubjectDraft.trim().replace(/\s+/g, ' ')
+    if (!value || value.length > 150) return
+    if (guestSubjects.some(subject => subject.toLocaleLowerCase('vi') === value.toLocaleLowerCase('vi'))) {
+      setGuestSubjectDraft(''); return
+    }
+    setF(prev => ({ ...prev, guest_lecturing_subjects: [...(prev.guest_lecturing_subjects || []), value] }))
+    setGuestSubjectDraft('')
+  }
+  function navigateGuestRequirement(tab) {
+    setShowGuestEligibility(false)
+    setActiveTab(tab)
+    requestAnimationFrame(() => document.getElementById(`profile-tab-${tab}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }))
+  }
 
   async function save(e) {
     e.preventDefault()
     setMsg('')
+    if (f.available_guest_lecturing && !guestEligible) {
+      setActiveTab('extras')
+      setShowGuestEligibility(true)
+      setMsg('Hồ sơ chưa đáp ứng đầy đủ các điều kiện đăng ký thỉnh giảng. Vui lòng bổ sung các mục còn thiếu.')
+      return
+    }
            const name = liveCap(f.full_name.trim().replace(/\s+/g, ' '))
     if (name.length < 2) { setMsg('Họ tên không được để trống.'); return }
 
@@ -557,7 +593,8 @@ export default function ProfileEdit() {
       citizen_id: citizenId || null,
       citizen_id_issue_date: f.citizen_id_issue_date || null,
       citizen_id_issued_by: t(f.citizen_id_issued_by),
-      available_guest_lecturing: Boolean(f.available_guest_lecturing),
+      available_guest_lecturing: Boolean(f.available_guest_lecturing) && guestEligible,
+      guest_lecturing_subjects: guestSubjects,
       available_business_consulting: Boolean(f.available_business_consulting),
       birth_date: f.birth_date || null, birth_place: t(f.birth_place),
       hometown: t(f.hometown), ethnicity: t(f.ethnicity), address: t(f.address),
@@ -950,12 +987,46 @@ export default function ProfileEdit() {
       <Collapse id="extras" title="VII. Hoạt động chuyên môn bổ sung" ctl={ctl}>
           <p className="muted">Thông tin này hiển thị với chính bạn và quản trị viên để hỗ trợ kết nối chuyên môn.</p>
           <div style={{ display: 'grid', gap: 12, marginTop: 14 }}>
-            <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <input type="checkbox" checked={Boolean(f.available_guest_lecturing)}
-                onChange={e => setF(prev => ({ ...prev, available_guest_lecturing: e.target.checked }))}
-                style={{ width: 18, height: 18, flex: '0 0 18px' }} />
-              Tôi sẵn sàng thỉnh giảng
-            </label>
+            <div className="guest-lecture-box">
+              <div className="guest-lecture-heading">
+                <div><strong>Đăng ký tham gia thỉnh giảng</strong>
+                  <p>Hồ sơ cần đáp ứng 4 tiêu chí để bật trạng thái sẵn sàng thỉnh giảng.</p></div>
+                <button type="button" className="guest-lecture-check" onClick={() => setShowGuestEligibility(true)}>Kiểm tra điều kiện</button>
+              </div>
+              <label className="guest-lecture-switch">
+                <input type="checkbox" checked={Boolean(f.available_guest_lecturing)}
+                  onChange={e => {
+                    if (!e.target.checked) { setF(prev => ({ ...prev, available_guest_lecturing: false })); return }
+                    if (!guestEligible) { setShowGuestEligibility(true); return }
+                    setF(prev => ({ ...prev, available_guest_lecturing: true }))
+                  }} />
+                Tôi sẵn sàng thỉnh giảng
+              </label>
+              <div className="guest-lecture-status" role="status">
+                {guestEligible ? 'Đã đáp ứng 4/4 điều kiện. Bạn có thể bật đăng ký thỉnh giảng.'
+                  : `Đã đáp ứng ${4 - guestMissing}/4 điều kiện. Còn thiếu ${guestMissing} điều kiện.`}
+              </div>
+              <div className="guest-lecture-subjects">
+                <label htmlFor="guest-lecture-subject">Môn học / chuyên đề có thể giảng dạy</label>
+                <div className="guest-lecture-entry">
+                  <input id="guest-lecture-subject" value={guestSubjectDraft}
+                    placeholder="Ví dụ: Trí tuệ nhân tạo, Lập trình Python..." maxLength={150}
+                    onChange={e => setGuestSubjectDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addGuestSubject() } }} />
+                  <button type="button" className="guest-lecture-add" onClick={addGuestSubject}>Thêm môn</button>
+                </div>
+                {guestSubjects.length > 0 && <div className="guest-lecture-chips">
+                  {guestSubjects.map(subject => <span className="guest-lecture-chip" key={subject}>{subject}
+                    <button type="button" aria-label={`Xóa môn ${subject}`} title="Xóa môn"
+                      onClick={() => setF(prev => ({ ...prev,
+                        guest_lecturing_subjects: prev.guest_lecturing_subjects.filter(x => x !== subject),
+                        available_guest_lecturing: prev.guest_lecturing_subjects.length > 1 && prev.available_guest_lecturing,
+                      }))}>×</button>
+                  </span>)}
+                </div>}
+                <small>Môn giảng dạy sẽ được lưu khi bạn bấm “Lưu thông tin” ở góc phải.</small>
+              </div>
+            </div>
             <label style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <input type="checkbox" checked={Boolean(f.available_business_consulting)}
                 onChange={e => setF(prev => ({ ...prev, available_business_consulting: e.target.checked }))}
@@ -965,6 +1036,38 @@ export default function ProfileEdit() {
           </div>
         </Collapse>
       </ProfileTabContext.Provider>
+
+      {showGuestEligibility && <div className="guest-eligibility-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setShowGuestEligibility(false) }}>
+        <div className="guest-eligibility-dialog" role="dialog" aria-modal="true" aria-labelledby="guest-eligibility-title">
+          <div className="guest-eligibility-titlebar">
+            <div><span className="guest-eligibility-kicker">ĐĂNG KÝ THỈNH GIẢNG</span>
+              <h2 id="guest-eligibility-title">Kiểm tra điều kiện hồ sơ</h2></div>
+            <button type="button" aria-label="Đóng" className="guest-dialog-close" onClick={() => setShowGuestEligibility(false)}>×</button>
+          </div>
+          <div className="guest-eligibility-content">
+            <p className="guest-eligibility-lead">{guestEligible
+              ? 'Hồ sơ đã đáp ứng đầy đủ các tiêu chí đăng ký thỉnh giảng.'
+              : `Hồ sơ chưa đủ điều kiện đăng ký thỉnh giảng (còn thiếu ${guestMissing} tiêu chí). Hãy bổ sung các thông tin được đánh dấu bên dưới.`}</p>
+            <div className="guest-eligibility-progress" aria-label={`${4 - guestMissing} trên 4 điều kiện đã hoàn thành`}>
+              <span style={{ width: `${(4 - guestMissing) * 25}%` }} /></div>
+            <div className="guest-eligibility-list">
+              {guestConditions.map(condition => <div key={condition.id} className={`guest-eligibility-item ${condition.valid ? 'is-ok' : 'is-missing'}`}>
+                <span className="guest-condition-icon" aria-hidden="true">{condition.valid ? '✓' : '!'}</span>
+                <div><strong>{condition.label}</strong><small>{condition.detail}</small></div>
+                {!condition.valid && <button type="button" onClick={() => navigateGuestRequirement(condition.tab)}>Bổ sung <span aria-hidden="true">→</span></button>}
+              </div>)}
+            </div>
+            <p className="guest-eligibility-disclaimer">Đây là tiêu chí sàng lọc hồ sơ của UTEProfile, không thay thế quy trình tuyển chọn hoặc quy định thỉnh giảng chính thức của đơn vị.</p>
+          </div>
+          <div className="guest-eligibility-footer"><button type="button" onClick={() => setShowGuestEligibility(false)}>Đóng</button>
+            {guestEligible && <button type="button" className="guest-dialog-primary" onClick={() => {
+              setF(prev => ({ ...prev, available_guest_lecturing: true }))
+              setShowGuestEligibility(false)
+              setActiveTab('extras')
+            }}>Đăng ký thỉnh giảng</button>}
+          </div>
+        </div>
+      </div>}
 
         <p className="hint profile-save-note">
           <strong>Lưu ý:</strong> Nút “Lưu thông tin” ở góc trên bên phải lưu thông tin cá nhân, học hàm, học vị và lựa chọn chuyên môn.
