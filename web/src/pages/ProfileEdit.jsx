@@ -525,7 +525,7 @@ export default function ProfileEdit() {
                   {addressLoading && addressFocused && <small className="geo-address-note">Đang tìm địa chỉ…</small>}
                   {addressError && addressFocused && <small className="geo-address-warning">{addressError} Bạn vẫn có thể nhập tay.</small>}
                   {addressFocused && addressSuggestions.length > 0 && (
-                    <div className="geo-address-results" role="listbox" id="geoapify-address-results" aria-label="Gợi ý địa chỉ Geoapify">
+                    <div className="geo-address-results" role="listbox" id="geoapify-address-results" aria-label="Gợi ý địa chỉ">
                       {addressSuggestions.map((place, index) => (
                         <button
                           key={`${place.place_id || place.formatted}-${index}`}
