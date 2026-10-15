@@ -130,6 +130,8 @@ export function buildCvDoc(d) {
     kv([
       [['Họ và tên', r.full_name], ['Giới tính', r.gender]],
       [['Ngày, tháng, năm sinh', fmtDate(p.birth_date)], ['Nơi sinh', p.birth_place]],
+      [['Số căn cước công dân', p.citizen_id], ['Ngày cấp CCCD', fmtDate(p.citizen_id_issue_date)]],
+      [['Cơ quan cấp CCCD', p.citizen_id_issued_by]],
       [['Quê quán', p.hometown], ['Dân tộc', p.ethnicity]],
       [['Học vị cao nhất', highest?.degree || reportedHighest || 'Chưa có dữ liệu đào tạo xác minh'], ['Năm, nước nhận học vị', degreeYear]],
       [['Học hàm được công nhận', academicRank], ['Năm công nhận học hàm', academicRank && r.title_year]],
