@@ -108,14 +108,14 @@ export default function Dashboard() {
             onClick={() => setSourceFilter('DOI')}
             className={`btn ${sourceFilter === 'DOI' ? 'btn-primary' : 'btn-ghost'}`}
             style={{ border: '1px solid #cfdaf4', padding: '12px 18px', borderRadius: 12 }}>
-            Công trình có DOI ({doiCount})
+            Công trình mã DOI ({doiCount})
           </button>
           <button
             type="button" role="tab" aria-selected={sourceFilter === 'MANUAL'}
             onClick={() => setSourceFilter('MANUAL')}
             className={`btn ${sourceFilter === 'MANUAL' ? 'btn-primary' : 'btn-ghost'}`}
             style={{ border: '1px solid #cfdaf4', padding: '12px 18px', borderRadius: 12 }}>
-            Công trình đăng thủ công, không DOI ({manualCount})
+            Công trình đăng thủ công ({manualCount})
           </button>
         </div>
       </section>
