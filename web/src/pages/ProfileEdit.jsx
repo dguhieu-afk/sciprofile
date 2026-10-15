@@ -67,7 +67,6 @@ function ProvinceAutocomplete({ label, value, onChange, items = vietnamProvinces
         aria-expanded={open && choices.length > 0}
         aria-controls={`${inputId}-list`}
         aria-autocomplete="list"
-        aria-invalid={Boolean(value && !valid)}
         onKeyDown={e => {
           if (e.key === 'Escape') setOpen(false)
           if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive(i => Math.min(i + 1, choices.length - 1)) }
@@ -88,12 +87,6 @@ function ProvinceAutocomplete({ label, value, onChange, items = vietnamProvinces
           ))}
         </div>
       )}
-      {value && !valid && <small role="alert" style={{ display: 'block', marginTop: 6, color: '#b45309' }}>
-        Hãy chọn đúng tỉnh/thành phố từ danh sách gợi ý; không lưu tên nhập dở.
-      </small>}
-      {open && !!search && !choices.length && <small style={{ display: 'block', marginTop: 6, color: '#b45309' }}>
-        Không tìm thấy địa danh trong danh sách. Hãy kiểm tra lại tên.
-      </small>}
     </div>
   )
 }
@@ -449,7 +442,7 @@ export default function ProfileEdit() {
       setActiveTab('personal'); setMsg('Vui lòng chọn giới tính trong danh sách.'); return
     }
     if (!validCivilDate(f.birth_date)) {
-      setActiveTab('personal'); setMsg('Vui lòng nhập ngày sinh hợp lệ.'); return
+      setActiveTab('personal'); setMsg('Ngày sinh đang trống hoặc chưa hợp lệ. Hãy kiểm tra ô Ngày sinh trong mục Thông tin cá nhân.'); return
     }
     if (!validProvince(f.birth_place)) {
       setActiveTab('personal'); setMsg('Nơi sinh chưa hợp lệ. Hãy gõ để tìm và chọn đúng tỉnh/thành phố trong danh sách gợi ý.'); return
@@ -468,7 +461,7 @@ export default function ProfileEdit() {
       const d = new Date(f.birth_date)
       const age = new Date().getFullYear() - d.getFullYear()
       if (isNaN(d) || d > new Date() || age < 16 || d.getFullYear() < 1930) {
-        setMsg('Ngày sinh không hợp lệ.'); return
+        setMsg('Ngày sinh chưa hợp lệ hoặc nằm ngoài khoảng được phép. Hãy kiểm tra ô Ngày sinh trong mục Thông tin cá nhân.'); return
       }
       birthYear = d.getFullYear()
     }
