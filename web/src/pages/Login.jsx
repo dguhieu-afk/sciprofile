@@ -61,9 +61,9 @@ export default function Login() {
   }
 
   const titles = {
-    login: ['Chào mừng trở lại', 'Đăng nhập để quản lý hồ sơ và công trình.'],
-    register: ['Tạo tài khoản nhà nghiên cứu', 'Xây dựng lý lịch khoa học của bạn chỉ trong vài phút.'],
-    forgot: ['Quên mật khẩu', 'Nhập email đã đăng ký, chúng tôi sẽ gửi liên kết đặt lại mật khẩu.'],
+    login: ['Đăng nhập UTEProfile', 'Quản lý hồ sơ khoa học, công trình nghiên cứu và kết nối cộng đồng học thuật.'],
+    register: ['Tạo tài khoản UTEProfile', 'Bắt đầu xây dựng và quản lý hồ sơ khoa học của bạn.'],
+    forgot: ['Khôi phục mật khẩu', 'Nhập địa chỉ email đã đăng ký để nhận hướng dẫn đặt lại mật khẩu.'],
   }
 
   return (
@@ -85,9 +85,9 @@ export default function Login() {
                 <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                 <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
               </svg>
-              Tiếp tục với Google
+              Đăng nhập bằng Google
             </button>
-            <div className="or"><span>hoặc dùng email</span></div>
+            <div className="or"><span>Hoặc đăng nhập bằng email</span></div>
           </>
         )}
         <form onSubmit={submit}>
@@ -96,28 +96,28 @@ export default function Login() {
               <input value={name} onChange={e => setName(liveCap(e.target.value))} placeholder="Nguyễn Văn A" required />
             </label>
           )}
-          <label>Email
+          <label>Địa chỉ email
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="ban@truong.edu.vn" required />
           </label>
           {mode !== 'forgot' && (
             <label>Mật khẩu
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Tối thiểu 6 ký tự" required />
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'register' ? 'Tối thiểu 6 ký tự' : 'Nhập mật khẩu của bạn'} required />
             </label>
           )}
           {mode === 'login' && (
             <div style={{ textAlign: 'right', marginTop: -6, marginBottom: 14 }}>
-              <button type="button" className="link-btn" onClick={() => go('forgot')}>Quên mật khẩu?</button>
+              <button type="button" className="link-btn" onClick={() => go('forgot')}>Quên mật khẩu</button>
             </div>
           )}
           {error && <div className="auth-error">{error}</div>}
           {info && <div className="ok-msg" style={{ marginTop: 0, marginBottom: 14 }}>{info}</div>}
           <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={busy}>
-            {busy ? 'Đang xử lý...' : mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Đăng ký' : 'Gửi liên kết đặt lại'}
+            {busy ? 'Đang xử lý...' : mode === 'login' ? 'Đăng nhập' : mode === 'register' ? 'Tạo tài khoản' : 'Gửi liên kết khôi phục'}
           </button>
         </form>
 
         <p className="auth-switch">
-          {mode === 'login' && <>Chưa có tài khoản? <button className="link-btn" onClick={() => go('register')}>Đăng ký ngay</button></>}
+          {mode === 'login' && <>Chưa có tài khoản? <button className="link-btn" onClick={() => go('register')}>Tạo tài khoản</button></>}
           {mode === 'register' && <>Đã có tài khoản? <button className="link-btn" onClick={() => go('login')}>Đăng nhập</button></>}
           {mode === 'forgot' && <button className="link-btn" onClick={() => go('login')}>← Quay lại đăng nhập</button>}
         </p>

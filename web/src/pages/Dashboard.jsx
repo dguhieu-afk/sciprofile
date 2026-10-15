@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [yearFilter, setYearFilter] = useState('ALL')
+  const [sourceFilter, setSourceFilter] = useState('DOI')
   const [justSent, setJustSent] = useState(Boolean(location.state?.submitted))
 
   useEffect(() => { if (ready && !user) navigate('/login') }, [ready, user, navigate])
@@ -66,7 +67,13 @@ export default function Dashboard() {
   }
 
   const years = [...new Set(items.map(i => Number(i.publication_year)).filter(Number.isFinite))].sort((a, b) => b - a)
-  const visibleItems = items.filter(i => yearFilter === 'ALL' || String(i.publication_year) === yearFilter)
+  // Không có trường 'nguồn nhập' trong DB hiện tại. Tạm phân nhóm theo việc có DOI.
+  const hasDoi = p => Boolean(String(p.doi || '').trim())
+  const doiCount = items.filter(hasDoi).length
+  const manualCount = items.length - doiCount
+  const visibleItems = items
+    .filter(p => (sourceFilter === 'DOI' ? hasDoi(p) : !hasDoi(p)))
+    .filter(p => yearFilter === 'ALL' || String(p.publication_year) === yearFilter)
     .sort((a, b) => Number(b.publication_year || 0) - Number(a.publication_year || 0) ||
       new Date(b.created_at || 0) - new Date(a.created_at || 0))
   const count = s => items.filter(i => i.status === s).length
@@ -93,8 +100,28 @@ export default function Dashboard() {
         <div><XCircle size={18} /><b>{count('REJECTED')}</b><span>Bị từ chối</span></div>
       </div>
 
+      <section style={{ marginTop: 26 }} aria-label="Phân loại công trình">
+        <h2 style={{ marginBottom: 12 }}>Công trình của tôi</h2>
+        <div role="tablist" aria-label="Loại công trình" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button
+            type="button" role="tab" aria-selected={sourceFilter === 'DOI'}
+            onClick={() => setSourceFilter('DOI')}
+            className={`btn ${sourceFilter === 'DOI' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ border: '1px solid #cfdaf4', padding: '12px 18px', borderRadius: 12 }}>
+            Công trình có DOI ({doiCount})
+          </button>
+          <button
+            type="button" role="tab" aria-selected={sourceFilter === 'MANUAL'}
+            onClick={() => setSourceFilter('MANUAL')}
+            className={`btn ${sourceFilter === 'MANUAL' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ border: '1px solid #cfdaf4', padding: '12px 18px', borderRadius: 12 }}>
+            Công trình đăng thủ công, không DOI ({manualCount})
+          </button>
+        </div>
+      </section>
+
       <div className="row-between" style={{ margin: '24px 0 12px', gap: 12, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>Danh sách công trình ({visibleItems.length})</h2>
+        <h2 style={{ margin: 0 }}>{sourceFilter === 'DOI' ? 'Công trình có DOI' : 'Công trình không có DOI'} ({visibleItems.length})</h2>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           Năm công bố
           <select aria-label="Lọc theo năm công bố" value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
@@ -109,7 +136,9 @@ export default function Dashboard() {
           <div className="empty">Bạn chưa có công trình nào. Bấm <b>Thêm công trình</b> để bắt đầu.</div>
         )}
         {!loading && items.length > 0 && visibleItems.length === 0 && (
-          <div className="empty">Không có công trình nào trong năm được chọn.</div>
+          <div className="empty">{yearFilter === 'ALL'
+            ? (sourceFilter === 'DOI' ? 'Bạn chưa có công trình nào có DOI.' : 'Bạn chưa có công trình đăng thủ công không có DOI.')
+            : 'Không có công trình thuộc nhóm này trong năm được chọn.'}</div>
         )}
         {visibleItems.map(p => (
           <article className="card result" key={p.id}>
