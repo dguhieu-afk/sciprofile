@@ -11,15 +11,28 @@ export default function Researchers() {
   const [list, setList] = useState([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase.from('researchers')
-      .select('id,avatar_url,full_name,academic_title,academic_degree,research_interests,organizations(name),publication_authors(publication_id)')
-      .then(({ data }) => {
-        setList((data || []).map(r => ({ ...r, works: r.publication_authors.length }))
-          .sort((a, b) => b.works - a.works))
+    async function loadResearchers() {
+      // Chỉ hiển thị hồ sơ liên kết tài khoản có lịch sử đăng nhập thực tế.
+      const [active, result] = await Promise.all([
+        supabase.rpc('public_logged_in_researcher_ids'),
+        supabase.from('researchers')
+          .select('id,user_id,avatar_url,full_name,academic_title,academic_degree,research_interests,organizations(name),publication_authors(publication_id)')
+      ])
+      if (active.error || result.error) {
+        setError(active.error?.message || result.error?.message)
         setLoading(false)
-      })
+        return
+      }
+      const validIds = new Set((active.data || []).map(x => String(x.researcher_id)))
+      setList((result.data || []).filter(r => r.user_id && validIds.has(String(r.id)))
+        .map(r => ({ ...r, works: r.publication_authors?.length || 0 }))
+        .sort((a, b) => b.works - a.works))
+      setLoading(false)
+    }
+    loadResearchers()
   }, [])
 
   const shown = useMemo(() => {
@@ -31,7 +44,7 @@ export default function Researchers() {
     <main className="container page">
       <div className="page-head">
         <h1>Nhà nghiên cứu</h1>
-        <p>Danh sách nhà nghiên cứu và hồ sơ khoa học công khai.</p>
+        <p>Danh sách nhà nghiên cứu đã đăng nhập hệ thống và có hồ sơ công khai.</p>
       </div>
       <div className="filters" style={{ gridTemplateColumns: '1fr' }}>
         <div className="filter-search">
@@ -40,6 +53,7 @@ export default function Researchers() {
         </div>
       </div>
       <div className="result-bar"><span>{loading ? 'Đang tải...' : `${shown.length} nhà nghiên cứu`}</span></div>
+      {error && <p className="auth-error" role="alert">Không tải được danh sách: {error}. Kiểm tra SQL bổ sung.</p>}
       <div className="grid-3">
         {shown.map(r => (
           <Link to={`/researchers/${r.id}`} className="card person" key={r.id}>
