@@ -1,7 +1,8 @@
 import { useRouteTitle } from '../useRouteTitle'
+import '../UTEAnimations.css'
 import Avatar from './Avatar'
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   GraduationCap, LogOut, ChevronDown, UserCircle, Eye, FolderOpen,
   Heart, ShieldCheck,
@@ -11,6 +12,7 @@ import { useAuth } from '../AuthContext'
 export default function Layout() {
   const { user, researcher, isAdmin, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   useRouteTitle()
   const [open, setOpen] = useState(false)
   const box = useRef(null)
@@ -76,7 +78,9 @@ export default function Layout() {
         </div>
       </header>
 
-      <Outlet />
+      <div className="ute-route-enter" key={location.pathname}>
+        <Outlet />
+      </div>
 
       <footer className="footer">
         © 2026 UTEProfile – Phát triển by nguyentrunghieu - dguhieu@gmail.com

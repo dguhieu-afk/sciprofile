@@ -1,0 +1,69 @@
+/* UTEProfile Motion System – chỉ thêm hiệu ứng hình ảnh, không thay logic. */
+:root { --ute-motion-fast: 150ms; --ute-motion-normal: 260ms; --ute-motion-slow: 380ms; --ute-motion-ease: cubic-bezier(.22, 1, .36, 1); }
+@keyframes ute-page-enter { from { opacity: 0; transform: translate3d(0, 10px, 0); } to { opacity: 1; transform: translate3d(0,0,0); } }
+@keyframes ute-panel-enter { from { opacity: 0; transform: translate3d(0, 9px, 0); } to { opacity: 1; transform: translate3d(0,0,0); } }
+@keyframes ute-fade-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ute-bar-grow { from { transform: scaleY(.18); opacity: .5; } to { transform: scaleY(1); opacity: 1; } }
+@keyframes ute-menu-pop { from { opacity: 0; transform: translate3d(0,-6px,0) scale(.985); } to { opacity: 1; transform: translate3d(0,0,0) scale(1); } }
+
+/* Trang mới: chuyển nhẹ, không làm nhấp nháy header/footer. */
+.ute-route-enter { animation: ute-page-enter var(--ute-motion-slow) var(--ute-motion-ease) both; min-width: 0; }
+
+/* Menu người dùng: hiện nhanh và mượt. */
+.nav .user-menu .menu { transform-origin: top right; animation: ute-menu-pop 190ms var(--ute-motion-ease) both; }
+.nav a, .nav button, .nav .logo-mark { transition: color var(--ute-motion-fast) ease, background-color var(--ute-motion-fast) ease, border-color var(--ute-motion-fast) ease, box-shadow var(--ute-motion-fast) ease; }
+.nav .user-btn:hover { box-shadow: 0 5px 15px rgba(38,70,116,.09); }
+
+/* Cảm giác phản hồi cho nút; không đổi kích thước layout. */
+.ute-route-enter :where(button, .btn, a.btn, [role="button"]):not(:disabled) { transition: transform var(--ute-motion-fast) var(--ute-motion-ease), box-shadow var(--ute-motion-fast) ease, background-color var(--ute-motion-fast) ease, border-color var(--ute-motion-fast) ease, color var(--ute-motion-fast) ease; }
+.ute-route-enter :where(button, .btn, a.btn, [role="button"]):not(:disabled):active { transform: scale(.985); }
+.ute-route-enter :where(button, .btn, a.btn, [role="button"]):focus-visible,
+.nav :where(button,a):focus-visible { outline: 3px solid rgba(40,99,219,.55); outline-offset: 3px; }
+
+/* Chuyển tab hồ sơ. Chỉ mục đang chọn được hiện; không động vào form state. */
+.professional-profile .profile-tab-button { transition: transform var(--ute-motion-fast) var(--ute-motion-ease), background-color var(--ute-motion-normal) ease, color var(--ute-motion-normal) ease, border-color var(--ute-motion-normal) ease, box-shadow var(--ute-motion-normal) ease; }
+.professional-profile .profile-tab-button:hover:not(.active) { transform: translateY(-2px); }
+.professional-profile .profile-tab-button.active { box-shadow: 0 7px 18px rgba(33,76,198,.18); }
+.professional-profile .profile-tab-panel:not([hidden]) > .acc-body,
+.professional-profile .profile-tab-panel:not([hidden]) > .profile-panel-title { animation: ute-panel-enter 320ms var(--ute-motion-ease) both; }
+.professional-profile .profile-tab-panel[hidden] { display: none !important; }
+.professional-profile .profile-hero { animation: ute-panel-enter 420ms var(--ute-motion-ease) both; }
+.professional-profile .profile-action-toolbar { transition: box-shadow var(--ute-motion-normal) ease, border-color var(--ute-motion-normal) ease; }
+.professional-profile .profile-action-toolbar:hover { box-shadow: 0 13px 30px rgba(14,55,65,.12); }
+.professional-profile .item { transition: box-shadow var(--ute-motion-normal) ease, border-color var(--ute-motion-normal) ease; }
+.professional-profile .item:hover { box-shadow: 0 5px 17px rgba(18,70,85,.06); border-color: #c7dad9; }
+.professional-profile .geo-address-results { animation: ute-menu-pop 180ms var(--ute-motion-ease) both; transform-origin: top center; }
+
+/* Form công trình, kho và CV: tăng phân cấp thị giác nhưng giữ bảng biểu đứng yên. */
+.ute-route-enter :where(.form-card, .profile-section-intro, .item-empty, .auth-error) { transition: border-color var(--ute-motion-normal) ease, box-shadow var(--ute-motion-normal) ease; }
+.ute-route-enter :where(.form-card, .profile-section-intro) { animation: ute-fade-enter 300ms ease both; }
+.ute-route-enter :where(input, select, textarea):not(:disabled) { transition: border-color var(--ute-motion-fast) ease, box-shadow var(--ute-motion-fast) ease, background-color var(--ute-motion-fast) ease; }
+.ute-route-enter :where(.auth-error, .success-msg, .alert-success, .alert-error) { animation: ute-panel-enter 240ms var(--ute-motion-ease) both; }
+
+/* Admin: chỉ chuyển động trên card/biểu đồ, tránh animate từng dòng bảng dài. */
+.ap-shell .ap-kpi { animation: ute-panel-enter 340ms var(--ute-motion-ease) both; transition: transform var(--ute-motion-normal) var(--ute-motion-ease), box-shadow var(--ute-motion-normal) ease; }
+.ap-shell .ap-kpi:nth-child(2) { animation-delay: 45ms; }
+.ap-shell .ap-kpi:nth-child(3) { animation-delay: 90ms; }
+.ap-shell .ap-kpi:nth-child(4) { animation-delay: 135ms; }
+.ap-shell .ap-kpi:nth-child(5) { animation-delay: 180ms; }
+.ap-shell .ap-kpi:nth-child(6) { animation-delay: 225ms; }
+.ap-shell .ap-kpi:hover { transform: translateY(-2px); box-shadow: 0 9px 24px rgba(25,53,102,.10); }
+.ap-shell .ap-panel { animation: ute-fade-enter 280ms ease both; }
+.ap-shell .ap-nav-btn { transition: background-color var(--ute-motion-fast) ease, color var(--ute-motion-fast) ease, transform var(--ute-motion-fast) ease; }
+.ap-shell .ap-nav-btn:hover { transform: translateX(2px); }
+.ap-shell .ap-bar, .ap-shell .ap-graph-item .ap-bar { transform-origin: bottom; animation: ute-bar-grow 560ms var(--ute-motion-ease) both; }
+.ap-shell .ap-bar-track { overflow: hidden; }
+.ap-shell tbody tr { transition: background-color var(--ute-motion-fast) ease; }
+
+/* Thiết bị cảm ứng: không giữ trạng thái hover giả. */
+@media (hover: none) { .professional-profile .profile-tab-button:hover:not(.active), .ap-shell .ap-kpi:hover, .ap-shell .ap-nav-btn:hover { transform: none; } }
+
+/* Tôn trọng người dùng nhạy cảm với chuyển động. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --ute-motion-fast: 0ms; --ute-motion-normal: 0ms; --ute-motion-slow: 0ms; }
+  .ute-route-enter, .ute-route-enter *, .nav .user-menu .menu,
+  .professional-profile .profile-hero, .professional-profile .profile-tab-panel:not([hidden]) > .acc-body,
+  .professional-profile .profile-tab-panel:not([hidden]) > .profile-panel-title,
+  .professional-profile .geo-address-results, .ap-shell .ap-kpi, .ap-shell .ap-panel,
+  .ap-shell .ap-bar { animation: none !important; transition-duration: 0.01ms !important; animation-delay: 0ms !important; transform: none !important; scroll-behavior: auto !important; }
+}

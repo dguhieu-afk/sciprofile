@@ -27,6 +27,44 @@ const vietnamProvinces = [
   'Thành phố Cần Thơ',
 ]
 
+// Danh mục gợi ý phổ biến, không phải danh sách chứng chỉ toàn cầu đầy đủ.
+// Người dùng luôn có thể nhập tên ngôn ngữ/chứng chỉ khác.
+const LANGUAGE_CERTIFICATES = {
+  'Tiếng Anh': ['IELTS Academic', 'IELTS General Training', 'TOEFL iBT', 'TOEIC Listening & Reading', 'TOEIC Speaking & Writing', 'Cambridge B2 First (FCE)', 'Cambridge C1 Advanced (CAE)', 'Cambridge C2 Proficiency (CPE)', 'PTE Academic', 'Duolingo English Test', 'Aptis ESOL', 'Linguaskill', 'OET', 'CELPIP', 'Trình độ CEFR A1', 'Trình độ CEFR A2', 'Trình độ CEFR B1', 'Trình độ CEFR B2', 'Trình độ CEFR C1', 'Trình độ CEFR C2'],
+  'Tiếng Trung': ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6', 'HSKK sơ cấp', 'HSKK trung cấp', 'HSKK cao cấp', 'TOCFL A1', 'TOCFL A2', 'TOCFL B1', 'TOCFL B2', 'TOCFL C1', 'TOCFL C2', 'BCT'],
+  'Tiếng Nhật': ['JLPT N5', 'JLPT N4', 'JLPT N3', 'JLPT N2', 'JLPT N1', 'J.TEST', 'NAT-TEST', 'BJT Business Japanese'],
+  'Tiếng Hàn': ['TOPIK I - cấp 1', 'TOPIK I - cấp 2', 'TOPIK II - cấp 3', 'TOPIK II - cấp 4', 'TOPIK II - cấp 5', 'TOPIK II - cấp 6', 'EPS-TOPIK', 'KLAT'],
+  'Tiếng Pháp': ['DELF A1', 'DELF A2', 'DELF B1', 'DELF B2', 'DALF C1', 'DALF C2', 'TCF', 'TEF', 'TEF Canada'],
+  'Tiếng Đức': ['Goethe-Zertifikat A1', 'Goethe-Zertifikat A2', 'Goethe-Zertifikat B1', 'Goethe-Zertifikat B2', 'Goethe-Zertifikat C1', 'Goethe-Zertifikat C2', 'TestDaF', 'DSH', 'telc Deutsch B1', 'telc Deutsch B2', 'ÖSD'],
+  'Tiếng Tây Ban Nha': ['DELE A1', 'DELE A2', 'DELE B1', 'DELE B2', 'DELE C1', 'DELE C2', 'SIELE'],
+  'Tiếng Ý': ['CILS A1', 'CILS A2', 'CILS B1', 'CILS B2', 'CILS C1', 'CILS C2', 'CELI', 'PLIDA'],
+  'Tiếng Bồ Đào Nha': ['CAPLE CIPLE (A2)', 'CAPLE DEPLE (B1)', 'CAPLE DIPLE (B2)', 'CAPLE DAPLE (C1)', 'CAPLE DUPLE (C2)', 'Celpe-Bras'],
+  'Tiếng Nga': ['TORFL / TRKI A1', 'TORFL / TRKI A2', 'TORFL / TRKI B1', 'TORFL / TRKI B2', 'TORFL / TRKI C1', 'TORFL / TRKI C2'],
+  'Tiếng Ả Rập': ['ALPT', 'CIMA', 'Trình độ CEFR A1', 'Trình độ CEFR B1', 'Trình độ CEFR B2'],
+  'Tiếng Hà Lan': ['CNaVT', 'Staatsexamen NT2 Programma I', 'Staatsexamen NT2 Programma II'],
+  'Tiếng Thổ Nhĩ Kỳ': ['TYS (Türkçe Yeterlik Sınavı)', 'TÖMER'],
+  'Tiếng Thái': ['CU-TFL'],
+  'Tiếng Indonesia': ['UKBI'],
+  'Tiếng Việt': ['VSTEP B1', 'VSTEP B2', 'VSTEP C1', 'Chứng chỉ tiếng Việt cho người nước ngoài'],
+}
+const LANGUAGE_OPTIONS = [
+  ...Object.keys(LANGUAGE_CERTIFICATES),
+  'Tiếng Hindi', 'Tiếng Bengali', 'Tiếng Urdu', 'Tiếng Ba Tư', 'Tiếng Do Thái',
+  'Tiếng Ba Lan', 'Tiếng Séc', 'Tiếng Hungary', 'Tiếng Romania', 'Tiếng Hy Lạp',
+  'Tiếng Thụy Điển', 'Tiếng Na Uy', 'Tiếng Đan Mạch', 'Tiếng Phần Lan',
+  'Tiếng Ukraina', 'Tiếng Malaysia', 'Tiếng Tagalog', 'Tiếng Khmer', 'Tiếng Lào',
+  'Tiếng Myanmar', 'Tiếng Swahili', 'Tiếng Tamil', 'Tiếng Nepal', 'Tiếng Latin',
+].sort((a, b) => a.localeCompare(b, 'vi'))
+const certificatesForLanguage = (language) => {
+  const key = Object.keys(LANGUAGE_CERTIFICATES).find(
+    name => name.toLocaleLowerCase('vi') === String(language || '').trim().toLocaleLowerCase('vi')
+  )
+  return key ? LANGUAGE_CERTIFICATES[key] : [
+    'Trình độ CEFR A1', 'Trình độ CEFR A2', 'Trình độ CEFR B1',
+    'Trình độ CEFR B2', 'Trình độ CEFR C1', 'Trình độ CEFR C2',
+  ]
+}
+
 // Các mục hồ sơ chia thành tab ngang. Không unmount form để tránh mất dữ liệu đang nhập.
 const ProfileTabContext = createContext(null)
 
@@ -147,8 +185,25 @@ function ItemSection({ id, title, hint, table, rid, fields, orderBy, asc, render
                 <textarea rows={2} value={draft[f.key]} placeholder={f.placeholder}
                   onChange={e => setDraft({ ...draft, [f.key]: capFirst(e.target.value) })} />
               ) : (
-                <input type={f.type || 'text'} value={draft[f.key]} placeholder={f.placeholder}
-                  onChange={e => setDraft({ ...draft, [f.key]: f.type === 'number' ? e.target.value : liveCap(e.target.value) })} />
+                <>
+                  <input
+                    type={f.type || 'text'}
+                    list={f.suggestions ? `profile-suggestions-${id}-${f.key}` : undefined}
+                    value={draft[f.key]}
+                    placeholder={f.placeholder}
+                    autoComplete={f.suggestions ? 'off' : undefined}
+                    onChange={e => setDraft(prev => ({
+                      ...prev,
+                      [f.key]: f.preserveCase || f.type === 'number' ? e.target.value : liveCap(e.target.value),
+                    }))}
+                  />
+                  {f.suggestions && (
+                    <datalist id={`profile-suggestions-${id}-${f.key}`}>
+                      {(typeof f.suggestions === 'function' ? f.suggestions(draft) : f.suggestions)
+                        .map(option => <option key={option} value={option} />)}
+                    </datalist>
+                  )}
+                </>
               )}
             </label>
           ))}
@@ -763,7 +818,7 @@ export default function ProfileEdit() {
           { key: 'start_year', label: 'Năm bắt đầu', type: 'number' },
           { key: 'end_year', label: 'Năm hoàn thành', type: 'number' },
           { key: 'level', label: 'Đề tài cấp', type: 'select', options: ['Nhà nước', 'Bộ', 'Ngành', 'Tỉnh/Thành phố', 'Trường', 'Cơ sở', 'Khác'] },
-          { key: 'role', label: 'Trách nhiệm tham gia', type: 'select', options: ['Chủ nhiệm' , 'Thư ký', 'Thành viên'] },
+          { key: 'role', label: 'Trách nhiệm tham gia', type: 'select', options: ['Chủ nhiệm', 'Thư ký', 'Thành viên'] },
         ]}
         render={i => ({
           main: i.title,
@@ -786,11 +841,12 @@ export default function ProfileEdit() {
       <ItemSection ctl={ctl}
         id="languages"
         title="VI. Ngoại ngữ" table="researcher_languages" rid={researcher.id} orderBy="id" asc
+        hint="Chọn hoặc nhập ngôn ngữ, sau đó chọn chứng chỉ phù hợp. Bạn có thể nhập thêm điểm số, cấp độ hoặc trình độ sử dụng (ví dụ: IELTS Academic 7.0, JLPT N2). Chỉ khai chứng chỉ đã được cấp; nếu chưa có chứng chỉ, có thể ghi trình độ sử dụng thực tế."
         fields={[
-          { key: 'language', label: 'Ngoại ngữ *', placeholder: 'Tiếng Anh' },
-          { key: 'level', label: 'Mức độ sử dụng', placeholder: 'Tốt (IELTS 7.0)' },
+          { key: 'language', label: 'Ngoại ngữ *', placeholder: 'Chọn hoặc nhập tên ngôn ngữ', suggestions: LANGUAGE_OPTIONS, preserveCase: true },
+          { key: 'level', label: 'Chứng chỉ / cấp độ / mức độ sử dụng', placeholder: 'Ví dụ: IELTS Academic 7.0 hoặc JLPT N2', suggestions: draft => certificatesForLanguage(draft.language), preserveCase: true, wide: true },
         ]}
-        render={i => ({ main: i.language, sub: i.level ? `Mức độ sử dụng: ${i.level}` : '' })}
+        render={i => ({ main: i.language, sub: i.level ? `Chứng chỉ / trình độ: ${i.level}` : '' })}
       />
 
       <Collapse id="extras" title="VII. Hoạt động chuyên môn bổ sung" ctl={ctl}>
