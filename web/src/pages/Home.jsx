@@ -32,19 +32,30 @@ export default function Home() {
         .limit(3)
       if (pubs) setPapers(pubs)
 
-      const { data: res } = await supabase
-        .from('researchers')
-        .select('id,avatar_url,full_name,academic_title,publication_authors(publication_id)')
-      if (res) {
-        setPeople(
-          res.map(r => ({ ...r, works: r.publication_authors.length }))
-            .sort((a, b) => b.works - a.works).slice(0, 3)
-        )
-      }
+      // Chỉ hiển thị và đếm người có tài khoản đã đăng nhập UTEProfile.
+      // Dùng cùng RPC với trang /researchers để hai số liệu luôn thống nhất.
+      const [activeResult, researcherResult] = await Promise.all([
+        supabase.rpc('public_logged_in_researcher_ids'),
+        supabase.from('researchers')
+          .select('id,user_id,avatar_url,full_name,academic_title,publication_authors(publication_id)'),
+      ])
+      const allowedIds = new Set(
+        (activeResult.data || []).map(row => String(row.researcher_id))
+      )
+      const eligibleResearchers = activeResult.error || researcherResult.error
+        ? []
+        : (researcherResult.data || []).filter(r =>
+            r.user_id && allowedIds.has(String(r.id))
+          )
+      setPeople(
+        eligibleResearchers
+          .map(r => ({ ...r, works: r.publication_authors?.length || 0 }))
+          .sort((a, b) => b.works - a.works)
+          .slice(0, 3)
+      )
 
-      const [a, b, c, d] = await Promise.all([
+      const [a, c, d] = await Promise.all([
         supabase.from('publications').select('*', { count: 'exact', head: true }).eq('status', 'APPROVED'),
-        supabase.from('researchers').select('*', { count: 'exact', head: true }),
         supabase.from('publications').select('citation_count').eq('status', 'APPROVED'),
         supabase.from('publication_research_areas')
           .select('research_area_id,research_areas(id,name),publications!inner(status)')
@@ -63,7 +74,12 @@ export default function Home() {
       setTopics(list.slice(0, 8))
 
       const totalCites = (c.data || []).reduce((s, x) => s + x.citation_count, 0)
-      setCounts({ pubs: a.count, res: b.count, cites: totalCites, areas: list.length })
+      setCounts({
+        pubs: a.count ?? 0,
+        res: activeResult.error || researcherResult.error ? '—' : eligibleResearchers.length,
+        cites: totalCites,
+        areas: list.length,
+      })
     }
     load()
   }, [])
@@ -75,7 +91,7 @@ export default function Home() {
 
   const stats = [
     { icon: <FileText size={22} />, value: counts.pubs, label: 'Công trình nghiên cứu' },
-    { icon: <Users size={22} />, value: counts.res, label: 'Nhà nghiên cứu' },
+    { icon: <Users size={22} />, value: counts.res, label: 'Nhà nghiên cứu đã đăng nhập' },
     { icon: <Quote size={22} />, value: counts.cites, label: 'Lượt trích dẫn' },
     { icon: <BookOpen size={22} />, value: counts.areas, label: 'Lĩnh vực có bài' },
   ]
@@ -85,8 +101,8 @@ export default function Home() {
       <section className="hero">
         <div className="container">
           <span className="tag">Nền tảng lý lịch khoa học &amp; kho nghiên cứu mở</span>
-          <h1>Kho lưu trữ, liên kết CV và kết nối nhà nghiên cứu</h1>
-          <p>Tìm kiếm công trình, xem hồ sơ khoa học với vài cú nhấp chuột.</p>
+          <h1>Khám phá tri thức, kết nối nhà nghiên cứu</h1>
+          <p>Tìm kiếm công trình, xem hồ sơ khoa học và trích dẫn chỉ với vài cú nhấp chuột.</p>
           <form className="search" onSubmit={submit}>
             <Search size={20} style={{ alignSelf: 'center', marginLeft: 8, color: '#64748b' }} />
             <input
