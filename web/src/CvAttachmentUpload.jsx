@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FileText, Upload, ExternalLink, Trash2 } from 'lucide-react'
-import { supabase } from '../supabase'
-
+import { supabase } from "./supabase";
 const BUCKET = 'researcher-cvs'
 const MAX_BYTES = 10 * 1024 * 1024
 const MIME = {

@@ -7,7 +7,7 @@ import { supabase } from '../supabase'
 import { useAuth } from '../AuthContext'
 import { liveCap, titleCase, capFirst } from '../utils'
 import ExportCvButton from '../components/ExportCvButton'
-import CvAttachmentUpload from '../components/CvAttachmentUpload'
+import CvAttachmentUpload from "../CvAttachmentUpload";
 import { highestCompletedDegree, sortEducation, validateEducation, academicWarnings, ACADEMIC_RANKS, PROFESSIONAL_TITLES, isAcademicRank } from '../academicLogic'
 import './ProfileEditProfessional.css'
 import './GuestLecturingEligibility.css'
